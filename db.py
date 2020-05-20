@@ -1,34 +1,19 @@
-# cursor.execute("CREATE DATABASE EngBot_Database")
-
-# cursor.execute("CREATE TABLE users (first_name VARCHAR(255), last_name VARCHAR(255))")
-# cursor.execute("CREATE TABLE data_eng (id INT AUTO_INCREMENT PRIMARY KEY, theme VARCHAR(144), subtheme VARCHAR(144), description LONGTEXT, link VARCHAR(255),"
-#                "photo BLOB)")
-# cursor.execute("CREATE TABLE tests_eng (id_quest INT AUTO_INCREMENT PRIMARY KEY, theme VARCHAR(144), question VARCHAR(255) UNIQUE, answer1 VARCHAR(255),"
-#                " answer2 VARCHAR(255), answer3 VARCHAR(255), answer4 VARCHAR(255))")
-
-# cursor.execute("ALTER TABLE users ADD (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT UNIQUE)")
-# cursor.execute("ALTER TABLE users CHANGE id id INT AUTO_INCREMENT FIRST")
-
-# --------------- Вставить из файла в БД ---------------------------------
-# sql = "INSERT INTO data_eng (theme, subtheme, description, link) VALUES (%s, %s,%s, %s)"
-# f = open("Info.txt", "r", encoding="utf-8")
-#
-# val = (f.readline(), f.readline(), f.read(), "https://www.englishdom.com/blog/imya-sushhestvitelnoe-v-anglijskom-yazyke/")
-# cursor.execute(sql, val)
-# conn.commit()
-# print(cursor.rowcount, "запись добавлена.")
-# f.close()
-# cursor.execute("SELECT description FROM data_eng WHERE subtheme='Future Tense'")
-# print(cursor.fetchone()[0])
-# ------------------------------------------------------------------------
-# --------------- Вывести из БД ---------------------------------
-# cursor.execute("SELECT description FROM data_eng WHERE subtheme='Классификация существительных'")
-# print(cursor.fetchone()[0])
-
+from typing import Tuple, Dict
 import mysql.connector
 
-# ЯКЩО ЩО ПОМІНЯТИ НА НАЧАЛЬНИЙ КОД ПРИЄДНАННЯ БД!!!!!!!!!!!!!!!!!!1
 
+DICT_THEMES = {
+        1: 'Noun (Имя существительное)',
+        2: 'Pronoun (Местоимение)',
+        3: 'Adjective/Adverb (Прилагательное/наречие)',
+        4: 'Number (Числительное)',
+        5: 'Verb (Глагол)',
+        6: 'Prepositions/phrasal verbs (Предлоги/фразовые глаголы)',
+        7: 'Sentence (Предложение)'
+}
+
+
+# ЯКЩО ЩО ПОМІНЯТИ НА НАЧАЛЬНИЙ КОД ПРИЄДНАННЯ БД!!!!!!!!!!!!!!!!!!1
 class DataConn:
 
         def __init__(self, user, password, host, port, database):
@@ -54,7 +39,7 @@ class DataConn:
                 """
                 self.conn.close()
                 if exc_val:
-                        raise
+                        raise exc_val
 
 # Декоратор для подключения к БД
 def ensure_connection(func):
@@ -85,20 +70,71 @@ def init_db(conn, force: bool = False):
 
         if force:
                 cursor.execute('DROP TABLE IF EXISTS users')
+                print("Таблица users была удалена!!!")
+
         cursor.execute('''
                 CREATE TABLE IF NOT EXISTS users (id INT AUTO_INCREMENT PRIMARY KEY, first_name VARCHAR(255),
-                                                  last_name VARCHAR(255), user_id INT UNIQUE)
+                                                  last_name VARCHAR(255), user_id INT UNIQUE, level INT)
         ''')
         # Сохранить изменения
         conn.commit()
 
 
 @ensure_connection
-def add_user(conn, first_name: str, last_name: str, user_id: int):
+def add_user_to_db(conn, first_name: str, last_name: str, user_id: int):
         cursor = conn.cursor()
-        sql = "INSERT INTO users (first_name, last_name, user_id) VALUES (%s, %s, %s)"
+        sql = "INSERT INTO users (first_name, last_name, user_id, level) VALUES (%s, %s, %s, 1)"
         val = (first_name, last_name, user_id)
         cursor.execute(sql, val)
         conn.commit()
 
-# add_user(first_name='Adidas', last_name="Nike", user_id=228)
+
+@ensure_connection
+def get_user_from_db(conn, user_id: int):
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT * FROM users WHERE user_id={user_id}")
+        return cursor.fetchone()
+
+
+@ensure_connection
+def delete_user_from_db(conn, user_id: int):
+        cursor = conn.cursor()
+        cursor.execute(f"DELETE FROM users WHERE user_id={user_id}")
+        conn.commit()
+
+
+@ensure_connection
+def inc_lvl(conn, user_id: int):
+        cursor = conn.cursor()
+        cursor.execute(f"UPDATE users SET level=level+1 WHERE user_id={user_id}")
+        conn.commit()
+
+
+@ensure_connection
+def get_lvl(conn, user_id: int):
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT level FROM users WHERE user_id={user_id}")
+        (lvl, ) = cursor.fetchone()
+        return lvl
+
+
+@ensure_connection
+def get_info_from_db(conn, user_id: int) -> Tuple[str, Dict[str, str], Dict[str, str]]:
+        """
+        Получение темы, подтем, описаний подтем и ссылок на каждую подтему.
+        :return: Tuple with 1 string and 2 dictionaries.
+        """
+        lvl = get_lvl(user_id=user_id)
+        theme = DICT_THEMES[lvl]
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT subtheme, description, link FROM data_eng WHERE theme='{theme}'")
+        info: list = cursor.fetchall()
+        # [info[i][0] for i in range(len(info))]  # Вывести только subtheme
+        dict_info = dict(zip([info[i][0] for i in range(len(info))], [info[i][1] for i in range(len(info))]))
+        dict_links = dict(zip([info[i][0] for i in range(len(info))], [info[i][2] for i in range(len(info))]))
+        return theme, dict_info, dict_links
+
+
+# level = get_lvl()
+print(get_info_from_db(user_id=635625366))
+# print(get_lvl(user_id=635625366))
