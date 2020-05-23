@@ -1,3 +1,38 @@
+# import time
+#
+#
+# class TimeChecker:
+#
+#     def __init__(self, name):
+#         self.name = name
+#
+#     def __enter__(self):
+#         self.start = self.get_time_in_sec()
+#         return self
+#
+#     def __exit__(self, exc_type, exc_val, exc_tb):
+#         now = self.get_time_in_sec()
+#         time_taken = now - self.start  # in seconds
+#         print("Time Taken by " + self.name + ": " + str(time_taken))
+#
+#     def get_time_in_sec(self):
+#         return int(round(time.time() * 1000))
+#
+#
+# def test_list_index_func(range_num):
+#     lis = [1,2,3,4,5]
+#     with TimeChecker('Process 1') as tim:
+#         for i in range(range_num):
+#             len(lis)-1
+#
+# test_list_index_func(1000)
+# test_list_index_func(10000)
+# test_list_index_func(100000)
+# test_list_index_func(1000000)
+#
+# print("Time: O(n)")
+# <=============================================================================>
+
 # cursor.execute("CREATE DATABASE EngBot_Database")
 
 # cursor.execute("CREATE TABLE users (first_name VARCHAR(255), last_name VARCHAR(255))")
@@ -25,7 +60,7 @@
 # --------------- Вывести из БД ---------------------------------
 # cursor.execute("SELECT description FROM data_eng WHERE subtheme='Классификация существительных'")
 # print(cursor.fetchone()[0])
-import re
+
 
 def main():
     # f = open("Info.txt", "r", encoding="utf-8")
@@ -43,9 +78,27 @@ def main():
     #
     # foo(458, 54, 4568, "asd")
 
-    str = 'Gogaas'
+    # str = 'Gogaas'
+    #
+    # print(re.search(r'\d|\W', str) is not None)
 
-    print(re.search(r'\d|\W', str) is not None)
+    # dictionary = {'Nickolas': 'Flamel', 'Igor': 'Mirik'}
+    # x = tuple(dictionary.items())
+    # print(x)
+
+    # l = ['asd', ' aswer', 5486, 87984, 54]
+    # i = l.index(l[-1])
+    # print(i == len(l)-1)
+
+    info = [('a', 2, 3, 4, 5), ('b', '5321', '86484', '844'), ('c', 684, 5684, 9), ('d', 456, 27, 87), ('f', 98, 89, 564)]
+    # d = {info[key][0]: info[key][1:5] for key in range(len(info))}
+    # print(d)
+    # print(d['a'], ' type is ', type(d['a']))
+    # print(info[1][1:3])
+    l = list(info[0])
+    print(l)
 
 if __name__ == '__main__':
     main()
+
+

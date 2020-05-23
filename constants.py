@@ -44,11 +44,37 @@ _Для этого нажмите команду_ /plan
 Если вы уже ознакомлены с ним, то *LET'S STUDY!*
 """
 
+del_user_msg = """
+Вы были удалены.
+Зарегистрируйетсь, пожалуйста, заново, с помощью команды /reg"""
+
+reg_msg = """
+Вы еще не зарегистрированы.
+Зарегистрируйетсь, пожалуйста, с помощью команды /reg"""
+
+
 # Идентификаторы кнопок
 CALLBACK_BUTTON_START = 'callback_button_start'
+CALLBACK_BUTTON_LINK = 'callback_button_link'
+CALLBACK_BUTTON_NEXT = 'callback_button_next'
+CALLBACK_BUTTON_BACK = 'callback_button_back'
+CALLBACK_BUTTON_TEST = 'callback_button_test'
+CALLBACK_BUTTON_VAR1 = 'callback_button_var1'
+CALLBACK_BUTTON_VAR2 = 'callback_button_var2'
+CALLBACK_BUTTON_VAR3 = 'callback_button_var3'
+CALLBACK_BUTTON_VAR4 = 'callback_button_var4'
+
 
 # Названия кнопок
 TITLES = {
     CALLBACK_BUTTON_START: "✌LET'S GET STARTED!!!✌",
+    CALLBACK_BUTTON_LINK: "Подробнее🔍",
+    CALLBACK_BUTTON_NEXT: "Next➡",
+    CALLBACK_BUTTON_BACK: "Back⬅️",
+    CALLBACK_BUTTON_TEST: "❓TEST❓",
+    CALLBACK_BUTTON_VAR1: "1️⃣",
+    CALLBACK_BUTTON_VAR2: "2️⃣",
+    CALLBACK_BUTTON_VAR3: "3️⃣",
+    CALLBACK_BUTTON_VAR4: "4️⃣",
 
 }

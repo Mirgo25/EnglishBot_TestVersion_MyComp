@@ -114,14 +114,17 @@ def inc_lvl(conn, user_id: int):
 def get_lvl(conn, user_id: int):
         cursor = conn.cursor()
         cursor.execute(f"SELECT level FROM users WHERE user_id={user_id}")
-        (lvl, ) = cursor.fetchone()
-        return lvl
+        try:
+                (lvl,) = cursor.fetchone()
+                return lvl
+        except TypeError:
+                return "Вы еще не зарегистрированы.\nЗарегистрируйетсь, пожалуйста, с помощью команды /reg"""
 
 
 @ensure_connection
-def get_info_from_db(conn, user_id: int) -> Tuple[str, Dict[str, str], Dict[str, str]]:
+def get_info_from_db(conn, user_id: int) -> Tuple[str, tuple, Dict[str, str], Dict[str, str]]:
         """
-        Получение темы, подтем, описаний подтем и ссылок на каждую подтему.
+        Получение темы, подтем, описаний подтем и ссылок на каждую подтему в зависимости от уровня пользователя
         :return: Tuple with 1 string and 2 dictionaries.
         """
         lvl = get_lvl(user_id=user_id)
@@ -129,12 +132,26 @@ def get_info_from_db(conn, user_id: int) -> Tuple[str, Dict[str, str], Dict[str,
         cursor = conn.cursor()
         cursor.execute(f"SELECT subtheme, description, link FROM data_eng WHERE theme='{theme}'")
         info: list = cursor.fetchall()
-        # [info[i][0] for i in range(len(info))]  # Вывести только subtheme
-        dict_info = dict(zip([info[i][0] for i in range(len(info))], [info[i][1] for i in range(len(info))]))
-        dict_links = dict(zip([info[i][0] for i in range(len(info))], [info[i][2] for i in range(len(info))]))
-        return theme, dict_info, dict_links
+        subthemes = tuple(info[i][0] for i in range(len(info)))                         # Подтемы
+        dict_info = dict(zip(subthemes, tuple(info[i][1] for i in range(len(info)))))   # Подтемы и описание
+        dict_links = dict(zip(subthemes, tuple(info[i][2] for i in range(len(info)))))  # Подтемы и ссылки
+        return theme, subthemes, dict_info, dict_links
 
 
-# level = get_lvl()
-print(get_info_from_db(user_id=635625366))
+@ensure_connection
+def get_tests_from_db(conn, user_id: int) -> Tuple[Dict[str, list], list, tuple]:
+        lvl = get_lvl(user_id=user_id)
+        theme = DICT_THEMES[lvl]
+        cursor = conn.cursor()
+        cursor.execute("SELECT question, answer1, answer2, answer3, answer4 "
+                       f"FROM tests_eng WHERE theme_quest='{theme}'")
+        info: list = cursor.fetchall()
+        quest_ans = {info[key][0]: list(info[key][1:5]) for key in range(len(info))}              # Вопросы и варианты ответов
+        questions = list(quest_ans.keys())                                                 # Вопросы
+        correct_ans = tuple(tuple(quest_ans.values())[i][0] for i in range(len(questions)))  # Правильные ответы
+        return quest_ans, questions, correct_ans
+
+
+# print(get_info_from_db(user_id=635625366))
 # print(get_lvl(user_id=635625366))
+# print(get_tests_from_db(user_id=635625366))

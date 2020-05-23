@@ -1,11 +1,14 @@
 # ================= standart modules =====================
 import logging
+import random
 import re
 import os
 # ==================== My modules ========================
 from db import (init_db, add_user_to_db, get_user_from_db,
-                delete_user_from_db, get_lvl, get_info_from_db)
+                delete_user_from_db, get_lvl, inc_lvl,
+                get_info_from_db, get_tests_from_db)
 import constants
+import parse
 from echo.config import load_config
 from echo.utils import logger_factory
 # ================= python-telegram-bot library ==========
@@ -13,6 +16,7 @@ from telegram import Bot
 from telegram import Update
 from telegram import InlineKeyboardButton
 from telegram import InlineKeyboardMarkup
+from telegram import ParseMode
 from telegram.ext import Updater
 from telegram.ext import CallbackContext
 from telegram.ext import CallbackQueryHandler
@@ -28,24 +32,208 @@ from telegram.utils.request import Request
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 debug_requests = logger_factory(logger=logger)
+sub_count = 0           # Для счета подтем
+quest_count = 0         # Для счета вопросов
+quest_used = list()     # Список использованных вопросов
+
+#  <=========================== Inline и Reply клавиатуры =========================================>
+@debug_requests
+def get_start_inline_keyboard(link: str):
+    """
+    Получить клавиатуру при обзоре 1-й подтемы
+    """
+    keyboard = [
+        # В этом списке каждый список - это строка,
+        # В каждом списке находяться кнопки. Сколько кнопок, столько столбцов
+        [
+            InlineKeyboardButton(constants.TITLES[constants.CALLBACK_BUTTON_LINK],
+                                 url=link)
+        ],
+        [
+          InlineKeyboardButton(constants.TITLES[constants.CALLBACK_BUTTON_NEXT],
+                               callback_data=constants.CALLBACK_BUTTON_NEXT)
+        ],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+@debug_requests
+def get_middle_inline_keyboard(link: str):
+    """
+    Получить клавиатуру при обзоре тем между 1-й и последней подтемами
+    """
+    keyboard = [
+        # В этом списке каждый список - это строка,
+        # В каждом списке находяться кнопки. Сколько кнопок, столько столбцов
+        [
+            InlineKeyboardButton(constants.TITLES[constants.CALLBACK_BUTTON_LINK],
+                                 url=link)
+        ],
+        [
+            InlineKeyboardButton(constants.TITLES[constants.CALLBACK_BUTTON_BACK],
+                                 callback_data=constants.CALLBACK_BUTTON_BACK),
+            InlineKeyboardButton(constants.TITLES[constants.CALLBACK_BUTTON_NEXT],
+                                 callback_data=constants.CALLBACK_BUTTON_NEXT)
+        ],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+@debug_requests
+def get_finish_inline_keyboard(link: str):
+    """
+    Получить клавиатуру при обзоре последней подтемы
+    """
+    keyboard = [
+        # В этом списке каждый список - это строка,
+        # В каждом списке находяться кнопки. Сколько кнопок, столько столбцов
+        [
+            InlineKeyboardButton(constants.TITLES[constants.CALLBACK_BUTTON_LINK],
+                                 url=link)
+        ],
+        [
+            InlineKeyboardButton(constants.TITLES[constants.CALLBACK_BUTTON_TEST],
+                                 callback_data=constants.CALLBACK_BUTTON_TEST),
+        ],
+        [
+            InlineKeyboardButton(constants.TITLES[constants.CALLBACK_BUTTON_BACK],
+                                 callback_data=constants.CALLBACK_BUTTON_BACK),
+        ],
+    ]
+    return InlineKeyboardMarkup(keyboard)
 
 
+@debug_requests
+def get_keyboard_for_tests():
+    """
+    Получить клавиатуру с вариантами ответов в тестах
+    """
+    keyboard = [
+        # В этом списке каждый список - это строка,
+        # В каждом списке находяться кнопки. Сколько кнопок, столько столбцов
+        [
+            InlineKeyboardButton(constants.TITLES[constants.CALLBACK_BUTTON_VAR1],
+                                 callback_data=constants.CALLBACK_BUTTON_VAR1),
+            InlineKeyboardButton(constants.TITLES[constants.CALLBACK_BUTTON_VAR2],
+                                 callback_data=constants.CALLBACK_BUTTON_VAR2)
+        ],
+        [
+            InlineKeyboardButton(constants.TITLES[constants.CALLBACK_BUTTON_VAR3],
+                                 callback_data=constants.CALLBACK_BUTTON_VAR3),
+            InlineKeyboardButton(constants.TITLES[constants.CALLBACK_BUTTON_VAR4],
+                                 callback_data=constants.CALLBACK_BUTTON_VAR4)
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+#  <========================================================================================>
+
+
+#  <=============== Обработка нажатий на кнопки Inline-клавиатуры =====================>
 @debug_requests
 def keyboard_handler(update: Update, context: CallbackContext):
     """
     Обработка нажатий на кнопки клавиатуры
     """
+    # current_text = update.effective_message.text
+    user_id = update.effective_user.id
+
+    # Получаем всю информацию по теме в зависимости от уровня пользователя
+    theme, tup_subthemes, descrp_dict, links_dict = get_info_from_db(user_id=user_id)
+    last_index = len(tup_subthemes)-1   # Последний индекс кортежа из подтем
+
+    # Получаем все вопросы и ответы на них в зависимости от прошедшей темы
+    quest_ans, questions, correct_ans = get_tests_from_db(user_id=user_id)
+
     # При каждом нажатии на кнопку Telegram будет присылать callback_query
     # Идентификатор нажатой кнопки (callback_query.data)
     query = update.callback_query
     data = query.data
 
     if data == constants.CALLBACK_BUTTON_START:
+        global sub_count
+        print("Нажал на START. sub_count стал ", sub_count)
+        subtheme = tup_subthemes[sub_count]
+        info = f'*{theme}*\n\n_{subtheme}_\n\n{descrp_dict[subtheme]}'
+        update.effective_message.reply_markdown(
+            text=info,
+            reply_markup=get_start_inline_keyboard(links_dict[subtheme])
+        )
+        print("Отработал START\n")
 
+    elif data == constants.CALLBACK_BUTTON_NEXT:
+        sub_count += 1
 
+        if sub_count > last_index:      # Для того, чтобы счет подтем не выходил
+            sub_count = last_index      # за пределы количества подтем (длины кортежа)
+        print("Нажал на NEXT. sub_count стал ", sub_count)
 
+        subtheme = tup_subthemes[sub_count]
+        info = f'*{theme}*\n\n_{subtheme}_\n\n{descrp_dict[subtheme]}'
+        if sub_count < last_index:
+            query.edit_message_text(
+                text=info,
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=get_middle_inline_keyboard(links_dict[subtheme])
+            )
+        elif sub_count == last_index:
+            query.edit_message_text(
+                text=info,
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=get_finish_inline_keyboard(links_dict[subtheme])
+            )
+        print("Отработал NEXT\n")
 
+    elif data == constants.CALLBACK_BUTTON_BACK:
+        sub_count -= 1
 
+        if sub_count < 0:      # Для того, чтобы счет подтем не был меньше 0
+            sub_count = 0
+        print("Нажал на BACK. sub_count стал ", sub_count)
+
+        subtheme = tup_subthemes[sub_count]
+        info = f'*{theme}*\n\n_{subtheme}_\n\n{descrp_dict[subtheme]}'
+        if sub_count > 0:
+            query.edit_message_text(
+                text=info,
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=get_middle_inline_keyboard(links_dict[subtheme])
+            )
+        elif sub_count == 0:
+            query.edit_message_text(
+                text=info,
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=get_start_inline_keyboard(links_dict[subtheme])
+            )
+        print("Отработал BACK \n")
+
+    elif data == constants.CALLBACK_BUTTON_TEST:
+        print("Нажал на TEST.")
+        global quest_count
+        global quest_used
+        quest, ans_var, quest_count = parse.get_test_msg(
+            questions=questions,
+            quest_ans=quest_ans,
+            quest_used=quest_used,
+            quest_count=quest_count
+        )
+        if quest == '':
+            text = "Вопросы закончились!"
+        else:
+            text = f"""
+            _Вопрос {quest_count}_
+                
+            *{quest}*
+                
+            1) {ans_var[0]}
+            2) {ans_var[1]}
+            3) {ans_var[2]}
+            4) {ans_var[3]}
+            """
+        update.effective_message.reply_markdown(
+            text=text,
+            reply_markup=get_keyboard_for_tests()
+        )
+
+        print("Отработал TEST \n")
+#  <========================================================================================>
 
 
 @debug_requests
@@ -57,7 +245,9 @@ def start_handler(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     if get_user_from_db(user_id=user_id) is not None:
         delete_user_from_db(user_id=user_id)
-    update.message.reply_markdown(text=constants.greeting_msg)
+        update.message.reply_markdown(text=constants.del_user_msg)
+    else:
+        update.message.reply_markdown(text=constants.greeting_msg)
 
 
 @debug_requests
@@ -66,8 +256,6 @@ def help_handler(update: Update, context: CallbackContext):
     Описание бота.
     """
     update.message.reply_markdown(text=constants.help_msg)
-
-
 
 @debug_requests
 def plan_handler(update: Update, context: CallbackContext):
@@ -82,7 +270,11 @@ def get_lvl_handler(update: Update, context: CallbackContext):
     """
     Получение уровня пользователя
     """
-    update.message.reply_text(text=f"Ваш уровень: {get_lvl(user_id=update.effective_user.id)}")
+    lvl = get_lvl(user_id=update.effective_user.id)
+    if isinstance(lvl, int):
+        update.message.reply_text(text=f"Ваш уровень: {lvl}")
+    elif isinstance(lvl, str):
+        update.message.reply_text(text=lvl)
 
 
 #  <============================== Для регистрации в боте ========================================>
@@ -170,27 +362,6 @@ def cancel_handler(update: Update, context: CallbackContext):
 
 
 
-# @debug_requests
-# def message_handler(update: Update, context: CallbackContext):
-#     name = update
-#     user = update.effective_user
-#     if user:
-#         name = user.first_name
-#     else:
-#         name = 'аноним'
-#
-#     text = update.effective_message.text
-#     reply_text = f'Привет, {name}!\n\n{text}'
-#
-#     # # Ответить пользователю
-#     # update.message.reply_text(
-#     #     text=reply_text,
-#     #     reply_markup=get_keyboard(),
-#     # )
-#
-#     # Записать сообщение в БД
-#     # if text:
-#     #     add_user_to_db()
 
 def main():
     logger.info('Start EnglishBot')
@@ -243,6 +414,9 @@ def main():
         ]
     )
     updater.dispatcher.add_handler(conv_handler)
+
+    handler_keyboard = CallbackQueryHandler(callback=keyboard_handler, pass_chat_data=True)
+    updater.dispatcher.add_handler(handler_keyboard)
 
     # Бесконечная обработка входящих сообщений
     updater.start_polling()
