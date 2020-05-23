@@ -9,22 +9,29 @@ def make_msg(theme: str, subtheme: str, descrp: str):
     return msg
 
 
-def get_test_msg(questions: list, quest_used: list, quest_ans: dict, quest_count: int) -> Tuple[str, tuple, int]:
+def get_test_msg(questions: list, quest_used: list, quest_ans: dict, quest_count: int) -> Tuple[int, str, tuple]:
     quest = random.choice(questions)
+    quest_not_used = list(set(questions) - set(quest_used))     # Неиспользованные вопросы
 
-    if quest not in quest_used and quest_count != len(questions):  # Если вопроса нет в списке использованных вопросов и вопросы не закончились
-        quest_used.append(quest)            # то добавляем вопрос в список
+    if quest not in quest_used and quest_not_used != []:
+        # Если вопроса нет в списке использованных вопросов и неисп. вопросы еще есть
+        quest_used.append(quest)            # то добавляем вопрос в список использованных
         quest_count += 1
         random.shuffle(quest_ans[quest])    # Перемешиваем варианты ответов
         ans_var = quest_ans[quest]
-        return quest, ans_var, quest_count
+        return quest_count, quest, ans_var
 
-    # elif quest in quest_used and quest_count != len(questions):  # Если вопрос в списке и вопросы не закончились, то
-    #     # рекурсия этой функции
-    #     get_test_msg(questions=questions, quest_used=quest_used, quest_ans=quest_ans, quest_count=quest_count)
+    elif quest in quest_used and quest_not_used != []:
+        # Если вопрос в списке использованных, а неисп. вопросы еще есть, то рекурсия этой функции
+        return get_test_msg(
+            questions=quest_not_used,   # передаем неиспользованные вопросы в рекурсивную функцию
+            quest_used=quest_used,
+            quest_ans=quest_ans,
+            quest_count=quest_count
+        )
 
-    elif quest_count > len(questions):
+    elif quest_not_used == []:
         quest = ''
         ans_var = tuple()
         quest_count = 0
-        return quest, ans_var, quest_count
+        return quest_count, quest, ans_var

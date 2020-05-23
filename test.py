@@ -90,12 +90,17 @@ def main():
     # i = l.index(l[-1])
     # print(i == len(l)-1)
 
-    info = [('a', 2, 3, 4, 5), ('b', '5321', '86484', '844'), ('c', 684, 5684, 9), ('d', 456, 27, 87), ('f', 98, 89, 564)]
-    # d = {info[key][0]: info[key][1:5] for key in range(len(info))}
-    # print(d)
-    # print(d['a'], ' type is ', type(d['a']))
-    # print(info[1][1:3])
-    l = list(info[0])
+    # info = [('a', 2, 3, 4, 5), ('b', '5321', '86484', '844'), ('c', 684, 5684, 9), ('d', 456, 27, 87), ('f', 98, 89, 564)]
+    # # d = {info[key][0]: info[key][1:5] for key in range(len(info))}
+    # # print(d)
+    # # print(d['a'], ' type is ', type(d['a']))
+    # # print(info[1][1:3])
+    # l = list(info[0])
+    # print(l)
+
+    s1 = [1, 2, 3, 4, 5]
+    s2 = [4]
+    l = list(set(s1) - set(s2))
     print(l)
 
 if __name__ == '__main__':

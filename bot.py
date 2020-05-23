@@ -208,29 +208,29 @@ def keyboard_handler(update: Update, context: CallbackContext):
         print("Нажал на TEST.")
         global quest_count
         global quest_used
-        quest, ans_var, quest_count = parse.get_test_msg(
-            questions=questions,
-            quest_ans=quest_ans,
-            quest_used=quest_used,
-            quest_count=quest_count
-        )
-        if quest == '':
-            text = "Вопросы закончились!"
-        else:
+        if quest_count < 1:
+            quest_count, quest, ans_var  = parse.get_test_msg(
+                questions=questions,
+                quest_ans=quest_ans,
+                quest_used=quest_used,
+                quest_count=quest_count
+            )
             text = f"""
             _Вопрос {quest_count}_
-                
-            *{quest}*
-                
-            1) {ans_var[0]}
-            2) {ans_var[1]}
-            3) {ans_var[2]}
-            4) {ans_var[3]}
-            """
-        update.effective_message.reply_markdown(
-            text=text,
-            reply_markup=get_keyboard_for_tests()
-        )
+
+*{quest}*
+
+1) {ans_var[0]}
+2) {ans_var[1]}
+3) {ans_var[2]}
+4) {ans_var[3]}
+                    """
+            update.effective_message.reply_markdown(
+                text=text,
+                reply_markup=get_keyboard_for_tests()
+            )
+        else:
+            pass
 
         print("Отработал TEST \n")
 #  <========================================================================================>
