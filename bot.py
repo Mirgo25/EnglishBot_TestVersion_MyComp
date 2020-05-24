@@ -16,6 +16,9 @@ from telegram import Bot
 from telegram import Update
 from telegram import InlineKeyboardButton
 from telegram import InlineKeyboardMarkup
+from telegram import ReplyKeyboardMarkup
+from telegram import KeyboardButton
+from telegram import ReplyKeyboardRemove
 from telegram import ParseMode
 from telegram.ext import Updater
 from telegram.ext import CallbackContext
@@ -102,7 +105,7 @@ def get_finish_inline_keyboard(link: str):
 
 
 @debug_requests
-def get_keyboard_for_tests():
+def get_inline_keyboard_for_tests():
     """
     Получить клавиатуру с вариантами ответов в тестах
     """
@@ -141,6 +144,9 @@ def keyboard_handler(update: Update, context: CallbackContext):
 
     # Получаем все вопросы и ответы на них в зависимости от прошедшей темы
     quest_ans, questions, correct_ans = get_tests_from_db(user_id=user_id)
+    context.user_data['QUEST_ANS'] = quest_ans
+    context.user_data['QUESTIONS'] = questions
+    context.user_data['CORRECT_ANS'] = correct_ans
 
     # При каждом нажатии на кнопку Telegram будет присылать callback_query
     # Идентификатор нажатой кнопки (callback_query.data)
@@ -206,15 +212,69 @@ def keyboard_handler(update: Update, context: CallbackContext):
 
     elif data == constants.CALLBACK_BUTTON_TEST:
         print("Нажал на TEST.")
+        sub_count = 0
         global quest_count
         global quest_used
-        if quest_count < 1:
-            quest_count, quest, ans_var  = parse.get_test_msg(
+        # if quest_count < 1:
+        quest_count, quest, ans_var = parse.get_test_msg(
+            questions=questions,
+            quest_ans=quest_ans,
+            quest_used=quest_used,
+            quest_count=quest_count
+        )
+
+        context.user_data['ANS_VAR'] = ans_var
+        text = f"""
+        _Вопрос {quest_count}_
+
+*{quest}*
+
+1) {ans_var[0]}
+2) {ans_var[1]}
+3) {ans_var[2]}
+4) {ans_var[3]}
+                """
+        update.effective_message.delete()
+        update.effective_message.reply_markdown(
+            text=text,
+            reply_markup=get_inline_keyboard_for_tests()
+        )
+        print("Отработал TEST \n")
+        return constants.VARS
+
+
+@debug_requests
+def button_vars_handler(update: Update, context: CallbackContext):
+
+    # При каждом нажатии на кнопку Telegram будет присылать callback_query
+    # Идентификатор нажатой кнопки (callback_query.data)
+    query = update.callback_query
+    data = query.data
+
+    ans_var = context.user_data['ANS_VAR']
+    questions = context.user_data['QUESTIONS']
+    quest_ans = context.user_data['QUEST_ANS']
+    correct_ans = context.user_data['CORRECT_ANS']
+
+    if data == constants.CALLBACK_BUTTON_VAR1:
+        print("Нажал на VAR1.")
+        global quest_count
+        global quest_used
+
+        if ans_var[0] in correct_ans:
+            query.edit_message_text(
+                text=constants.correct_answer
+            )
+            quest_count, quest, ans_var = parse.get_test_msg(
                 questions=questions,
                 quest_ans=quest_ans,
                 quest_used=quest_used,
                 quest_count=quest_count
             )
+            context.user_data['ANS_VAR'] = ans_var
+            if quest_count == 0:
+                print("Conversation --- END\n")
+                return ConversationHandler.END
             text = f"""
             _Вопрос {quest_count}_
 
@@ -227,12 +287,272 @@ def keyboard_handler(update: Update, context: CallbackContext):
                     """
             update.effective_message.reply_markdown(
                 text=text,
-                reply_markup=get_keyboard_for_tests()
+                reply_markup=get_inline_keyboard_for_tests()
             )
-        else:
-            pass
 
-        print("Отработал TEST \n")
+        elif ans_var[0] not in correct_ans:
+            query.edit_message_text(
+                text=constants.wrong_answer
+            )
+            quest_count, quest, ans_var = parse.get_test_msg(
+                questions=questions,
+                quest_ans=quest_ans,
+                quest_used=quest_used,
+                quest_count=quest_count
+            )
+            context.user_data['ANS_VAR'] = ans_var
+            if quest_count == 0:
+                print("Conversation --- END\n")
+                return ConversationHandler.END
+            text = f"""
+            _Вопрос {quest_count}_
+
+*{quest}*
+
+1) {ans_var[0]}
+2) {ans_var[1]}
+3) {ans_var[2]}
+4) {ans_var[3]}
+                    """
+            update.effective_message.reply_markdown(
+                text=text,
+                reply_markup=get_inline_keyboard_for_tests()
+            )
+
+        print("Отработал VAR1 \n")
+
+    elif data == constants.CALLBACK_BUTTON_VAR2:
+        print("Нажал на VAR2.")
+        if ans_var[1] in correct_ans:
+            query.edit_message_text(
+                text=constants.correct_answer
+            )
+            quest_count, quest, ans_var = parse.get_test_msg(
+                questions=questions,
+                quest_ans=quest_ans,
+                quest_used=quest_used,
+                quest_count=quest_count
+            )
+            context.user_data['ANS_VAR'] = ans_var
+            if quest_count == 0:
+                print("Conversation --- END\n")
+                return ConversationHandler.END
+            text = f"""
+            _Вопрос {quest_count}_
+
+*{quest}*
+
+1) {ans_var[0]}
+2) {ans_var[1]}
+3) {ans_var[2]}
+4) {ans_var[3]}
+                    """
+            update.effective_message.reply_markdown(
+                text=text,
+                reply_markup=get_inline_keyboard_for_tests()
+            )
+
+        elif ans_var[1] not in correct_ans:
+            query.edit_message_text(
+                text=constants.wrong_answer
+            )
+            quest_count, quest, ans_var = parse.get_test_msg(
+                questions=questions,
+                quest_ans=quest_ans,
+                quest_used=quest_used,
+                quest_count=quest_count
+            )
+            context.user_data['ANS_VAR'] = ans_var
+            if quest_count == 0:
+                print("Conversation --- END\n")
+                return ConversationHandler.END
+            text = f"""
+            _Вопрос {quest_count}_
+
+*{quest}*
+
+1) {ans_var[0]}
+2) {ans_var[1]}
+3) {ans_var[2]}
+4) {ans_var[3]}
+                    """
+            update.effective_message.reply_markdown(
+                text=text,
+                reply_markup=get_inline_keyboard_for_tests()
+            )
+        print("Отработал VAR2 \n")
+
+    elif data == constants.CALLBACK_BUTTON_VAR3:
+        print("Нажал на VAR3.")
+        if ans_var[2] in correct_ans:
+            query.edit_message_text(
+                text=constants.correct_answer
+            )
+            quest_count, quest, ans_var = parse.get_test_msg(
+                questions=questions,
+                quest_ans=quest_ans,
+                quest_used=quest_used,
+                quest_count=quest_count
+            )
+            context.user_data['ANS_VAR'] = ans_var
+            if quest_count == 0:
+                print("Conversation --- END\n")
+                return ConversationHandler.END
+            text = f"""
+            _Вопрос {quest_count}_
+
+*{quest}*
+
+1) {ans_var[0]}
+2) {ans_var[1]}
+3) {ans_var[2]}
+4) {ans_var[3]}
+                    """
+            update.effective_message.reply_markdown(
+                text=text,
+                reply_markup=get_inline_keyboard_for_tests()
+            )
+
+        elif ans_var[2] not in correct_ans:
+            query.edit_message_text(
+                text=constants.wrong_answer
+            )
+            quest_count, quest, ans_var = parse.get_test_msg(
+                questions=questions,
+                quest_ans=quest_ans,
+                quest_used=quest_used,
+                quest_count=quest_count
+            )
+            context.user_data['ANS_VAR'] = ans_var
+            if quest_count == 0:
+                print("Conversation --- END\n")
+                return ConversationHandler.END
+            text = f"""
+            _Вопрос {quest_count}_
+
+*{quest}*
+
+1) {ans_var[0]}
+2) {ans_var[1]}
+3) {ans_var[2]}
+4) {ans_var[3]}
+                    """
+            update.effective_message.reply_markdown(
+                text=text,
+                reply_markup=get_inline_keyboard_for_tests()
+            )
+        print("Отработал VAR3 \n")
+
+    elif data == constants.CALLBACK_BUTTON_VAR4:
+        if ans_var[3] in correct_ans:
+            query.edit_message_text(
+                text=constants.correct_answer
+            )
+            quest_count, quest, ans_var = parse.get_test_msg(
+                questions=questions,
+                quest_ans=quest_ans,
+                quest_used=quest_used,
+                quest_count=quest_count
+            )
+            context.user_data['ANS_VAR'] = ans_var
+            if quest_count == 0:
+                print("Conversation --- END\n")
+                return ConversationHandler.END
+            text = f"""
+            _Вопрос {quest_count}_
+
+*{quest}*
+
+1) {ans_var[0]}
+2) {ans_var[1]}
+3) {ans_var[2]}
+4) {ans_var[3]}
+                    """
+            update.effective_message.reply_markdown(
+                text=text,
+                reply_markup=get_inline_keyboard_for_tests()
+            )
+
+        elif ans_var[3] not in correct_ans:
+            query.edit_message_text(
+                text=constants.wrong_answer
+            )
+            quest_count, quest, ans_var = parse.get_test_msg(
+                questions=questions,
+                quest_ans=quest_ans,
+                quest_used=quest_used,
+                quest_count=quest_count
+            )
+            context.user_data['ANS_VAR'] = ans_var
+            if quest_count == 0:
+                print("Conversation --- END\n")
+                return ConversationHandler.END
+            text = f"""
+            _Вопрос {quest_count}_
+
+*{quest}*
+
+1) {ans_var[0]}
+2) {ans_var[1]}
+3) {ans_var[2]}
+4) {ans_var[3]}
+                    """
+            update.effective_message.reply_markdown(
+                text=text,
+                reply_markup=get_inline_keyboard_for_tests()
+            )
+        print("Отработал VAR4 \n")
+
+    print("Conversation --- CONTINUE\n")
+    return constants.VARS
+
+
+
+# @debug_requests
+# def button_test_handler(update: Update, context: CallbackContext):
+#
+#     user_id = update.effective_user.id
+#
+#     # Получаем все вопросы и ответы на них в зависимости от прошедшей темы
+#     quest_ans, questions, correct_ans = get_tests_from_db(user_id=user_id)
+#
+#     context.user_data['QUEST_ANS'] = quest_ans
+#     context.user_data['QUESTIONS'] = questions
+#     context.user_data['CORRECT_ANS'] = correct_ans
+#
+#     # При каждом нажатии на кнопку Telegram будет присылать callback_query
+#     # Идентификатор нажатой кнопки (callback_query.data)
+#     query = update.callback_query
+#     data = query.data
+#     if data == constants.CALLBACK_BUTTON_TEST:
+#         print("Нажал на TEST.")
+#         global quest_count
+#         global quest_used
+#         if quest_count < 1:
+#             quest_count, quest, ans_var = parse.get_test_msg(
+#                 questions=questions,
+#                 quest_ans=quest_ans,
+#                 quest_used=quest_used,
+#                 quest_count=quest_count
+#             )
+#             context.user_data['ANS_VAR'] = ans_var
+#             text = f"""
+#             _Вопрос {quest_count}_
+#
+# *{quest}*
+#
+# 1) {ans_var[0]}
+# 2) {ans_var[1]}
+# 3) {ans_var[2]}
+# 4) {ans_var[3]}
+#                     """
+#             update.effective_message.delete()
+#             update.effective_message.reply_markdown(
+#                 text=text,
+#                 reply_markup=get_inline_keyboard_for_tests()
+#             )
+#         return constants.VARS
+
 #  <========================================================================================>
 
 
@@ -397,7 +717,7 @@ def main():
     handler_lvl = CommandHandler('level', get_lvl_handler)
     updater.dispatcher.add_handler(handler_lvl)
 
-    conv_handler = ConversationHandler(
+    handler_reg = ConversationHandler(
         entry_points=[
             CommandHandler('reg', registr_handler, pass_user_data=True)
         ],
@@ -413,10 +733,32 @@ def main():
             CommandHandler('cancel', cancel_handler)
         ]
     )
-    updater.dispatcher.add_handler(conv_handler)
+    updater.dispatcher.add_handler(handler_reg)
 
-    handler_keyboard = CallbackQueryHandler(callback=keyboard_handler, pass_chat_data=True)
-    updater.dispatcher.add_handler(handler_keyboard)
+    handler_conv = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(callback=keyboard_handler, pass_user_data=True)
+        ],
+        states={
+            constants.VARS: [
+                CallbackQueryHandler(callback=button_vars_handler, pass_user_data=True)
+            ],
+        },
+        fallbacks=[
+            CommandHandler('cancel', cancel_handler)
+        ],
+        # per_message=True
+    )
+    updater.dispatcher.add_handler(handler_conv)
+
+    # handler_vars = CallbackQueryHandler(callback=button_vars_handler, pass_user_data=True)
+    # updater.dispatcher.add_handler(handler_vars)
+    # handler_keyboard = CallbackQueryHandler(callback=keyboard_handler, pass_user_data=True)
+    # updater.dispatcher.add_handler(handler_keyboard)
+
+
+
+
 
     # Бесконечная обработка входящих сообщений
     updater.start_polling()

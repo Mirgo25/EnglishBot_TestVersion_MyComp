@@ -8,6 +8,18 @@ def make_msg(theme: str, subtheme: str, descrp: str):
     msg = '\n\n'.join([theme, subtheme, descrp])
     return msg
 
+def make_mes(quest_count: int, quest: str, ans_var: tuple):
+    return f"""
+            _Вопрос {quest_count}_
+
+    *{quest}*
+
+    1) {ans_var[0]}
+    2) {ans_var[1]}
+    3) {ans_var[2]}
+    4) {ans_var[3]}
+                    """
+
 
 def get_test_msg(questions: list, quest_used: list, quest_ans: dict, quest_count: int) -> Tuple[int, str, tuple]:
     quest = random.choice(questions)
@@ -32,6 +44,6 @@ def get_test_msg(questions: list, quest_used: list, quest_ans: dict, quest_count
 
     elif quest_not_used == []:
         quest = ''
-        ans_var = tuple()
+        ans_var = ('', '', '', '')
         quest_count = 0
         return quest_count, quest, ans_var
