@@ -1,8 +1,6 @@
 # ================= standart modules =====================
 import logging
-import random
 import re
-import os
 # ==================== My modules ========================
 from db import (init_db, add_user_to_db, get_user_from_db,
                 delete_user_from_db, get_lvl, inc_lvl,
@@ -14,11 +12,9 @@ from echo.utils import logger_factory
 # ================= python-telegram-bot library ==========
 from telegram import Bot
 from telegram import Update
+from telegram import Sticker
 from telegram import InlineKeyboardButton
 from telegram import InlineKeyboardMarkup
-from telegram import ReplyKeyboardMarkup
-from telegram import KeyboardButton
-from telegram import ReplyKeyboardRemove
 from telegram import ParseMode
 from telegram.ext import Updater
 from telegram.ext import CallbackContext
@@ -29,7 +25,7 @@ from telegram.ext import MessageHandler
 from telegram.ext import Filters
 from telegram.utils.request import Request
 
-#
+
 # print(os.environ.get('TG_CONF'))
 # config = load_config()
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -38,6 +34,8 @@ debug_requests = logger_factory(logger=logger)
 sub_count = 0           # Для счета подтем
 quest_count = 0         # Для счета вопросов
 quest_used = list()     # Список использованных вопросов
+correct_ans_count = 0   # Для подсчета правильных ответов
+flag_shutup = 0         # Для отсчета присланных юзером ненужных сообщений
 
 #  <=========================== Inline и Reply клавиатуры =========================================>
 @debug_requests
@@ -126,6 +124,32 @@ def get_inline_keyboard_for_tests():
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
+
+@debug_requests
+def get_button_new_theme():
+    """
+    Получить клавиатуру с вариантами ответов в тестах
+    """
+    keyboard = [
+        [
+            InlineKeyboardButton(text=constants.BUTTON_TITLE_NEW_THEME,
+                                 callback_data=constants.CALLBACK_BUTTON_START)
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+@debug_requests
+def get_button_old_theme():
+    """
+    Получить клавиатуру с вариантами ответов в тестах
+    """
+    keyboard = [
+        [
+            InlineKeyboardButton(text=constants.BUTTON_TITLE_OLD_THEME,
+                                 callback_data=constants.CALLBACK_BUTTON_START)
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
 #  <========================================================================================>
 
 
@@ -135,7 +159,6 @@ def keyboard_handler(update: Update, context: CallbackContext):
     """
     Обработка нажатий на кнопки клавиатуры
     """
-    # current_text = update.effective_message.text
     user_id = update.effective_user.id
 
     # Получаем всю информацию по теме в зависимости от уровня пользователя
@@ -212,11 +235,11 @@ def keyboard_handler(update: Update, context: CallbackContext):
 
     elif data == constants.CALLBACK_BUTTON_TEST:
         print("Нажал на TEST.")
-        sub_count = 0
+        sub_count = 0       # Обнуляем, чтобы новое открытие тем не было с конца
         global quest_count
         global quest_used
-        # if quest_count < 1:
-        quest_count, quest, ans_var = parse.get_test_msg(
+        quest_used = []
+        quest_count, ans_var, text = parse.get_test_msg(
             questions=questions,
             quest_ans=quest_ans,
             quest_used=quest_used,
@@ -224,16 +247,6 @@ def keyboard_handler(update: Update, context: CallbackContext):
         )
 
         context.user_data['ANS_VAR'] = ans_var
-        text = f"""
-        _Вопрос {quest_count}_
-
-*{quest}*
-
-1) {ans_var[0]}
-2) {ans_var[1]}
-3) {ans_var[2]}
-4) {ans_var[3]}
-                """
         update.effective_message.delete()
         update.effective_message.reply_markdown(
             text=text,
@@ -245,7 +258,9 @@ def keyboard_handler(update: Update, context: CallbackContext):
 
 @debug_requests
 def button_vars_handler(update: Update, context: CallbackContext):
-
+    """
+    Обработка нажатий на кнопки (варианты ответов) в тестах
+    """
     # При каждом нажатии на кнопку Telegram будет присылать callback_query
     # Идентификатор нажатой кнопки (callback_query.data)
     query = update.callback_query
@@ -260,299 +275,175 @@ def button_vars_handler(update: Update, context: CallbackContext):
         print("Нажал на VAR1.")
         global quest_count
         global quest_used
+        global correct_ans_count
 
-        if ans_var[0] in correct_ans:
-            query.edit_message_text(
-                text=constants.correct_answer
-            )
-            quest_count, quest, ans_var = parse.get_test_msg(
-                questions=questions,
-                quest_ans=quest_ans,
-                quest_used=quest_used,
-                quest_count=quest_count
-            )
-            context.user_data['ANS_VAR'] = ans_var
-            if quest_count == 0:
-                print("Conversation --- END\n")
-                return ConversationHandler.END
-            text = f"""
-            _Вопрос {quest_count}_
-
-*{quest}*
-
-1) {ans_var[0]}
-2) {ans_var[1]}
-3) {ans_var[2]}
-4) {ans_var[3]}
-                    """
-            update.effective_message.reply_markdown(
-                text=text,
-                reply_markup=get_inline_keyboard_for_tests()
-            )
-
-        elif ans_var[0] not in correct_ans:
-            query.edit_message_text(
-                text=constants.wrong_answer
-            )
-            quest_count, quest, ans_var = parse.get_test_msg(
-                questions=questions,
-                quest_ans=quest_ans,
-                quest_used=quest_used,
-                quest_count=quest_count
-            )
-            context.user_data['ANS_VAR'] = ans_var
-            if quest_count == 0:
-                print("Conversation --- END\n")
-                return ConversationHandler.END
-            text = f"""
-            _Вопрос {quest_count}_
-
-*{quest}*
-
-1) {ans_var[0]}
-2) {ans_var[1]}
-3) {ans_var[2]}
-4) {ans_var[3]}
-                    """
-            update.effective_message.reply_markdown(
-                text=text,
-                reply_markup=get_inline_keyboard_for_tests()
-            )
+        quest_count, correct_ans_count, ans_var, text, text_answer = parse.check_answer(
+            button=data,
+            ans_var=ans_var,
+            correct_ans=correct_ans,
+            questions=questions,
+            quest_ans=quest_ans,
+            quest_used=quest_used,
+            quest_count=quest_count,
+            correct_ans_count=correct_ans_count
+        )
+        query.edit_message_text(
+            text=text_answer
+        )
+        context.user_data['ANS_VAR'] = ans_var
+        if quest_count == 0:
+            for i in range(len(correct_ans)):
+                query.message.delete()
+                update.effective_message.message_id -= 1
+            if correct_ans_count == len(correct_ans):
+                inc_lvl(user_id=update.effective_user.id)
+                update.effective_message.reply_markdown(text=constants.congrat_msg)
+                update.effective_message.reply_markdown(
+                    text=constants.offer_msg,
+                    reply_markup=get_button_new_theme()
+                )
+            elif correct_ans_count != len(correct_ans):
+                update.effective_message.reply_markdown(
+                    text=constants.upset_msg,
+                    reply_markup=get_button_old_theme()
+                )
+            print("Conversation --- END. {} прав ответов\n".format(correct_ans_count))
+            correct_ans_count = 0
+            return ConversationHandler.END
+        update.effective_message.reply_markdown(
+            text=text,
+            reply_markup=get_inline_keyboard_for_tests()
+        )
 
         print("Отработал VAR1 \n")
 
     elif data == constants.CALLBACK_BUTTON_VAR2:
         print("Нажал на VAR2.")
-        if ans_var[1] in correct_ans:
-            query.edit_message_text(
-                text=constants.correct_answer
-            )
-            quest_count, quest, ans_var = parse.get_test_msg(
-                questions=questions,
-                quest_ans=quest_ans,
-                quest_used=quest_used,
-                quest_count=quest_count
-            )
-            context.user_data['ANS_VAR'] = ans_var
-            if quest_count == 0:
-                print("Conversation --- END\n")
-                return ConversationHandler.END
-            text = f"""
-            _Вопрос {quest_count}_
-
-*{quest}*
-
-1) {ans_var[0]}
-2) {ans_var[1]}
-3) {ans_var[2]}
-4) {ans_var[3]}
-                    """
-            update.effective_message.reply_markdown(
-                text=text,
-                reply_markup=get_inline_keyboard_for_tests()
-            )
-
-        elif ans_var[1] not in correct_ans:
-            query.edit_message_text(
-                text=constants.wrong_answer
-            )
-            quest_count, quest, ans_var = parse.get_test_msg(
-                questions=questions,
-                quest_ans=quest_ans,
-                quest_used=quest_used,
-                quest_count=quest_count
-            )
-            context.user_data['ANS_VAR'] = ans_var
-            if quest_count == 0:
-                print("Conversation --- END\n")
-                return ConversationHandler.END
-            text = f"""
-            _Вопрос {quest_count}_
-
-*{quest}*
-
-1) {ans_var[0]}
-2) {ans_var[1]}
-3) {ans_var[2]}
-4) {ans_var[3]}
-                    """
-            update.effective_message.reply_markdown(
-                text=text,
-                reply_markup=get_inline_keyboard_for_tests()
-            )
+        quest_count, correct_ans_count, ans_var, text, text_answer = parse.check_answer(
+            button=data,
+            ans_var=ans_var,
+            correct_ans=correct_ans,
+            questions=questions,
+            quest_ans=quest_ans,
+            quest_used=quest_used,
+            quest_count=quest_count,
+            correct_ans_count=correct_ans_count
+        )
+        query.edit_message_text(
+            text=text_answer
+        )
+        context.user_data['ANS_VAR'] = ans_var
+        if quest_count == 0:
+            for i in range(len(correct_ans)):
+                query.message.delete()
+                update.effective_message.message_id -= 1
+            if correct_ans_count == len(correct_ans):
+                inc_lvl(user_id=update.effective_user.id)
+                update.effective_message.reply_markdown(text=constants.congrat_msg)
+                update.effective_message.reply_markdown(
+                    text=constants.offer_msg,
+                    reply_markup=get_button_new_theme()
+                )
+            elif correct_ans_count != len(correct_ans):
+                update.effective_message.reply_markdown(
+                    text=constants.upset_msg,
+                    reply_markup=get_button_old_theme()
+                )
+            print("Conversation --- END. {} прав ответов\n".format(correct_ans_count))
+            correct_ans_count = 0
+            return ConversationHandler.END
+        update.effective_message.reply_markdown(
+            text=text,
+            reply_markup=get_inline_keyboard_for_tests()
+        )
         print("Отработал VAR2 \n")
 
     elif data == constants.CALLBACK_BUTTON_VAR3:
         print("Нажал на VAR3.")
-        if ans_var[2] in correct_ans:
-            query.edit_message_text(
-                text=constants.correct_answer
-            )
-            quest_count, quest, ans_var = parse.get_test_msg(
-                questions=questions,
-                quest_ans=quest_ans,
-                quest_used=quest_used,
-                quest_count=quest_count
-            )
-            context.user_data['ANS_VAR'] = ans_var
-            if quest_count == 0:
-                print("Conversation --- END\n")
-                return ConversationHandler.END
-            text = f"""
-            _Вопрос {quest_count}_
-
-*{quest}*
-
-1) {ans_var[0]}
-2) {ans_var[1]}
-3) {ans_var[2]}
-4) {ans_var[3]}
-                    """
-            update.effective_message.reply_markdown(
-                text=text,
-                reply_markup=get_inline_keyboard_for_tests()
-            )
-
-        elif ans_var[2] not in correct_ans:
-            query.edit_message_text(
-                text=constants.wrong_answer
-            )
-            quest_count, quest, ans_var = parse.get_test_msg(
-                questions=questions,
-                quest_ans=quest_ans,
-                quest_used=quest_used,
-                quest_count=quest_count
-            )
-            context.user_data['ANS_VAR'] = ans_var
-            if quest_count == 0:
-                print("Conversation --- END\n")
-                return ConversationHandler.END
-            text = f"""
-            _Вопрос {quest_count}_
-
-*{quest}*
-
-1) {ans_var[0]}
-2) {ans_var[1]}
-3) {ans_var[2]}
-4) {ans_var[3]}
-                    """
-            update.effective_message.reply_markdown(
-                text=text,
-                reply_markup=get_inline_keyboard_for_tests()
-            )
+        quest_count, correct_ans_count, ans_var, text, text_answer = parse.check_answer(
+            button=data,
+            ans_var=ans_var,
+            correct_ans=correct_ans,
+            questions=questions,
+            quest_ans=quest_ans,
+            quest_used=quest_used,
+            quest_count=quest_count,
+            correct_ans_count=correct_ans_count
+        )
+        query.edit_message_text(
+            text=text_answer
+        )
+        context.user_data['ANS_VAR'] = ans_var
+        if quest_count == 0:
+            for i in range(len(correct_ans)):
+                query.message.delete()
+                update.effective_message.message_id -= 1
+            if correct_ans_count == len(correct_ans):
+                inc_lvl(user_id=update.effective_user.id)
+                update.effective_message.reply_markdown(text=constants.congrat_msg)
+                update.effective_message.reply_markdown(
+                    text=constants.offer_msg,
+                    reply_markup=get_button_new_theme()
+                )
+            elif correct_ans_count != len(correct_ans):
+                update.effective_message.reply_markdown(
+                    text=constants.upset_msg,
+                    reply_markup=get_button_old_theme()
+                )
+            print("Conversation --- END. {} прав ответов\n".format(correct_ans_count))
+            correct_ans_count = 0
+            return ConversationHandler.END
+        update.effective_message.reply_markdown(
+            text=text,
+            reply_markup=get_inline_keyboard_for_tests()
+        )
         print("Отработал VAR3 \n")
 
     elif data == constants.CALLBACK_BUTTON_VAR4:
-        if ans_var[3] in correct_ans:
-            query.edit_message_text(
-                text=constants.correct_answer
-            )
-            quest_count, quest, ans_var = parse.get_test_msg(
-                questions=questions,
-                quest_ans=quest_ans,
-                quest_used=quest_used,
-                quest_count=quest_count
-            )
-            context.user_data['ANS_VAR'] = ans_var
-            if quest_count == 0:
-                print("Conversation --- END\n")
-                return ConversationHandler.END
-            text = f"""
-            _Вопрос {quest_count}_
-
-*{quest}*
-
-1) {ans_var[0]}
-2) {ans_var[1]}
-3) {ans_var[2]}
-4) {ans_var[3]}
-                    """
-            update.effective_message.reply_markdown(
-                text=text,
-                reply_markup=get_inline_keyboard_for_tests()
-            )
-
-        elif ans_var[3] not in correct_ans:
-            query.edit_message_text(
-                text=constants.wrong_answer
-            )
-            quest_count, quest, ans_var = parse.get_test_msg(
-                questions=questions,
-                quest_ans=quest_ans,
-                quest_used=quest_used,
-                quest_count=quest_count
-            )
-            context.user_data['ANS_VAR'] = ans_var
-            if quest_count == 0:
-                print("Conversation --- END\n")
-                return ConversationHandler.END
-            text = f"""
-            _Вопрос {quest_count}_
-
-*{quest}*
-
-1) {ans_var[0]}
-2) {ans_var[1]}
-3) {ans_var[2]}
-4) {ans_var[3]}
-                    """
-            update.effective_message.reply_markdown(
-                text=text,
-                reply_markup=get_inline_keyboard_for_tests()
-            )
+        print("Нажал на VAR4.")
+        # Проверка ответа пользователя
+        quest_count, correct_ans_count, ans_var, text, text_answer = parse.check_answer(
+            button=data,
+            ans_var=ans_var,
+            correct_ans=correct_ans,
+            questions=questions,
+            quest_ans=quest_ans,
+            quest_used=quest_used,
+            quest_count=quest_count,
+            correct_ans_count=correct_ans_count
+        )
+        # Ответ от бота
+        query.edit_message_text(
+            text=text_answer
+        )
+        context.user_data['ANS_VAR'] = ans_var
+        if quest_count == 0:
+            for i in range(len(correct_ans)):
+                query.message.delete()
+                update.effective_message.message_id -= 1
+            if correct_ans_count == len(correct_ans):
+                inc_lvl(user_id=update.effective_user.id)
+                update.effective_message.reply_markdown(text=constants.congrat_msg)
+                update.effective_message.reply_markdown(
+                    text=constants.offer_msg,
+                    reply_markup=get_button_new_theme()
+                )
+            elif correct_ans_count != len(correct_ans):
+                update.effective_message.reply_markdown(
+                    text=constants.upset_msg,
+                    reply_markup=get_button_old_theme()
+                )
+            print("Conversation --- END. {} прав ответов\n".format(correct_ans_count))
+            correct_ans_count = 0
+            return ConversationHandler.END
+        update.effective_message.reply_markdown(
+            text=text,
+            reply_markup=get_inline_keyboard_for_tests()
+        )
         print("Отработал VAR4 \n")
 
-    print("Conversation --- CONTINUE\n")
+    print("Conversation --- CONTINUE {}\n".format(correct_ans_count))
     return constants.VARS
-
-
-
-# @debug_requests
-# def button_test_handler(update: Update, context: CallbackContext):
-#
-#     user_id = update.effective_user.id
-#
-#     # Получаем все вопросы и ответы на них в зависимости от прошедшей темы
-#     quest_ans, questions, correct_ans = get_tests_from_db(user_id=user_id)
-#
-#     context.user_data['QUEST_ANS'] = quest_ans
-#     context.user_data['QUESTIONS'] = questions
-#     context.user_data['CORRECT_ANS'] = correct_ans
-#
-#     # При каждом нажатии на кнопку Telegram будет присылать callback_query
-#     # Идентификатор нажатой кнопки (callback_query.data)
-#     query = update.callback_query
-#     data = query.data
-#     if data == constants.CALLBACK_BUTTON_TEST:
-#         print("Нажал на TEST.")
-#         global quest_count
-#         global quest_used
-#         if quest_count < 1:
-#             quest_count, quest, ans_var = parse.get_test_msg(
-#                 questions=questions,
-#                 quest_ans=quest_ans,
-#                 quest_used=quest_used,
-#                 quest_count=quest_count
-#             )
-#             context.user_data['ANS_VAR'] = ans_var
-#             text = f"""
-#             _Вопрос {quest_count}_
-#
-# *{quest}*
-#
-# 1) {ans_var[0]}
-# 2) {ans_var[1]}
-# 3) {ans_var[2]}
-# 4) {ans_var[3]}
-#                     """
-#             update.effective_message.delete()
-#             update.effective_message.reply_markdown(
-#                 text=text,
-#                 reply_markup=get_inline_keyboard_for_tests()
-#             )
-#         return constants.VARS
-
 #  <========================================================================================>
 
 
@@ -577,6 +468,7 @@ def help_handler(update: Update, context: CallbackContext):
     """
     update.message.reply_markdown(text=constants.help_msg)
 
+
 @debug_requests
 def plan_handler(update: Update, context: CallbackContext):
     """
@@ -595,6 +487,27 @@ def get_lvl_handler(update: Update, context: CallbackContext):
         update.message.reply_text(text=f"Ваш уровень: {lvl}")
     elif isinstance(lvl, str):
         update.message.reply_text(text=lvl)
+
+
+@debug_requests
+def shut_up_handler(update: Update, context: CallbackContext):
+    """
+    SHUT UP!!
+    """
+    global flag_shutup
+    if flag_shutup < 2:
+        flag_shutup += 1
+    else:
+        update.effective_message.reply_sticker(
+            sticker=Sticker(
+                file_id='CAACAgIAAxkBAAIEa17LHgIb22R-EgkdalwzI327QeVAAAK-AAMw1J0RtKcIkYQmscoZBA',
+                file_unique_id='AgADvgADMNSdEQ',
+                width=512,
+                height=512,
+                is_animated=True
+            )
+        )
+        flag_shutup = 0
 
 
 #  <============================== Для регистрации в боте ========================================>
@@ -751,12 +664,8 @@ def main():
     )
     updater.dispatcher.add_handler(handler_conv)
 
-    # handler_vars = CallbackQueryHandler(callback=button_vars_handler, pass_user_data=True)
-    # updater.dispatcher.add_handler(handler_vars)
-    # handler_keyboard = CallbackQueryHandler(callback=keyboard_handler, pass_user_data=True)
-    # updater.dispatcher.add_handler(handler_keyboard)
-
-
+    handler_shutup = MessageHandler(Filters.all, shut_up_handler)
+    updater.dispatcher.add_handler(handler_shutup)
 
 
 

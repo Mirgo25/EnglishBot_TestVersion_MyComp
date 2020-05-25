@@ -55,16 +55,36 @@ reg_msg = """
 correct_answer = "Правильно✅"
 wrong_answer = "Неправильно❌"
 
+congrat_msg = """
+🎉🎉🎉Урааа!!!🎉🎉🎉
+
+Вы ответили верно на все вопросы!👏
+
+Ваш уровень повысился!!🚀"""
+
+offer_msg = """
+Можете приступить к изучению новой темы!🙃"""
+
+upset_msg = """
+К сожалению, вы не дали верных ответов на все вопросы😞
+
+*Но нельзя опускать руки!!!*😃
+
+Пожалуйста, пройдите тему заново и у вас всё получиться!😉"""
+
+# shut_up_msg = ""
+
 # Идентификаторы кнопок
 CALLBACK_BUTTON_START = 'callback_button_start'
 CALLBACK_BUTTON_LINK = 'callback_button_link'
 CALLBACK_BUTTON_NEXT = 'callback_button_next'
 CALLBACK_BUTTON_BACK = 'callback_button_back'
 CALLBACK_BUTTON_TEST = 'callback_button_test'
-CALLBACK_BUTTON_VAR1 = 'callback_button_var1'
-CALLBACK_BUTTON_VAR2 = 'callback_button_var2'
-CALLBACK_BUTTON_VAR3 = 'callback_button_var3'
-CALLBACK_BUTTON_VAR4 = 'callback_button_var4'
+# От 0 до 3, потому что в 'parse.py' ф-ии check_answer() используем аргумент button, что исп. для выбора ответа в tuple
+CALLBACK_BUTTON_VAR1 = '0'  # Клавиша 1 - идентификатор 0
+CALLBACK_BUTTON_VAR2 = '1'  # Клавиша 2 - идентификатор 1
+CALLBACK_BUTTON_VAR3 = '2'  # Клавиша 3 - идентификатор 2
+CALLBACK_BUTTON_VAR4 = '3'  # Клавиша 4 - идентификатор 3
 
 
 # Названия кнопок
@@ -78,5 +98,6 @@ TITLES = {
     CALLBACK_BUTTON_VAR2: "2️⃣",
     CALLBACK_BUTTON_VAR3: "3️⃣",
     CALLBACK_BUTTON_VAR4: "4️⃣",
-
 }
+BUTTON_TITLE_NEW_THEME = "🤩Приступим!🤩"
+BUTTON_TITLE_OLD_THEME = "Я не сдамся!💪"
