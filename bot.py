@@ -128,7 +128,7 @@ def get_inline_keyboard_for_tests():
 @debug_requests
 def get_button_new_theme():
     """
-    Получить клавиатуру с вариантами ответов в тестах
+    Получить кнопку после правильных ответов на тесты
     """
     keyboard = [
         [
@@ -141,7 +141,7 @@ def get_button_new_theme():
 @debug_requests
 def get_button_old_theme():
     """
-    Получить клавиатуру с вариантами ответов в тестах
+    Получить кнопку после неправильных ответов на тесты
     """
     keyboard = [
         [
@@ -213,7 +213,7 @@ def keyboard_handler(update: Update, context: CallbackContext):
     elif data == constants.CALLBACK_BUTTON_BACK:
         sub_count -= 1
 
-        if sub_count < 0:      # Для того, чтобы счет подтем не был меньше 0
+        if sub_count <= 0:      # Для того, чтобы счет подтем не был меньше 0
             sub_count = 0
         print("Нажал на BACK. sub_count стал ", sub_count)
 
@@ -253,6 +253,7 @@ def keyboard_handler(update: Update, context: CallbackContext):
             reply_markup=get_inline_keyboard_for_tests()
         )
         print("Отработал TEST \n")
+        context.chat_data['in_conv_test'] = True
         return constants.VARS
 
 
@@ -261,6 +262,8 @@ def button_vars_handler(update: Update, context: CallbackContext):
     """
     Обработка нажатий на кнопки (варианты ответов) в тестах
     """
+    if not context.chat_data['in_conv_test']:
+        return ConversationHandler.END
     # При каждом нажатии на кнопку Telegram будет присылать callback_query
     # Идентификатор нажатой кнопки (callback_query.data)
     query = update.callback_query
@@ -291,18 +294,18 @@ def button_vars_handler(update: Update, context: CallbackContext):
             text=text_answer
         )
         context.user_data['ANS_VAR'] = ans_var
-        if quest_count == 0:
-            for i in range(len(correct_ans)):
+        if quest_count == 0:                                # Когда закончились вопросы
+            for i in range(len(correct_ans)):               # Для удаления всех ответов пользователя
                 query.message.delete()
                 update.effective_message.message_id -= 1
-            if correct_ans_count == len(correct_ans):
+            if correct_ans_count == len(correct_ans):       # Если все ответы верны
                 inc_lvl(user_id=update.effective_user.id)
                 update.effective_message.reply_markdown(text=constants.congrat_msg)
                 update.effective_message.reply_markdown(
                     text=constants.offer_msg,
                     reply_markup=get_button_new_theme()
                 )
-            elif correct_ans_count != len(correct_ans):
+            elif correct_ans_count != len(correct_ans):     # Если хоть один ответ не верный
                 update.effective_message.reply_markdown(
                     text=constants.upset_msg,
                     reply_markup=get_button_old_theme()
@@ -459,6 +462,13 @@ def start_handler(update: Update, context: CallbackContext):
         update.message.reply_markdown(text=constants.del_user_msg)
     else:
         update.message.reply_markdown(text=constants.greeting_msg)
+    try:
+        if context.chat_data['in_conv_reg'] or context.chat_data['in_conv_test']:    # Если в диалоге, то отменить диалог
+            context.chat_data['in_conv_reg'] = False
+            context.chat_data['in_conv_test'] = False
+            return ConversationHandler.END
+    except KeyError:
+        pass
 
 
 @debug_requests
@@ -495,6 +505,12 @@ def shut_up_handler(update: Update, context: CallbackContext):
     SHUT UP!!
     """
     global flag_shutup
+    # user_id = update.effective_user.id
+    # text = update.effective_message.text
+    #
+    # if user_id == 357912833:
+    #     update.effective_message.bot.send_message(chat_id=429623673, text=text)
+
     if flag_shutup < 2:
         flag_shutup += 1
     else:
@@ -517,6 +533,7 @@ def registr_handler(update: Update, context: CallbackContext):
     Начало регистрации в боте и проверка на наличие юзера в БД
     :return: constants.NAME
     """
+    context.chat_data['in_conv_reg'] = True
     if get_user_from_db(user_id=update.effective_user.id) is not None:
         update.message.reply_text(text="Вы уже зарегистрированы в боте!")
         return ConversationHandler.END
@@ -580,7 +597,7 @@ def surname_handler(update: Update, context: CallbackContext):
             ],
         )
     )
-
+    context.chat_data['in_conv_reg'] = False
     return ConversationHandler.END
 
 
@@ -589,7 +606,30 @@ def cancel_handler(update: Update, context: CallbackContext):
     """
     Отмена всего диалога, данные будут утеряны
     """
-    update.message.reply_text(text='Отмена.\nДля регистрации с нуля нажмите /reg')
+    try:
+        if context.chat_data['in_conv_reg']:
+            update.message.reply_text(text='Отмена.\nДля регистрации с нуля нажмите /reg')
+            context.chat_data['in_conv_reg'] = False
+    except KeyError:
+        pass
+
+    try:
+        if context.chat_data['in_conv_test']:
+            update.message.reply_markdown(
+                text='Отмена теста.\nПожалуйста, пройдите заново материал.',
+                reply_markup=InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [
+                            InlineKeyboardButton(text=constants.BUTTON_TITLE_AGAIN,
+                                                 callback_data=constants.CALLBACK_BUTTON_START)
+                        ],
+                    ],
+                )
+            )
+            context.chat_data['in_conv_test'] = False
+    except Exception as e:
+        print(e)
+
     return ConversationHandler.END
 #  <========================================================================================>
 
@@ -615,21 +655,10 @@ def main():
     logger.info(f'Bot information: {info}')
 
     # Подключение к СУБД
-    init_db()
+    # init_db()
 
     # Повесить обработчики команд
-    handler_start = CommandHandler('start', start_handler)
-    updater.dispatcher.add_handler(handler_start)
-
-    handler_help = CommandHandler('help', help_handler)
-    updater.dispatcher.add_handler(handler_help)
-
-    handler_plan = CommandHandler('plan', plan_handler)
-    updater.dispatcher.add_handler(handler_plan)
-
-    handler_lvl = CommandHandler('level', get_lvl_handler)
-    updater.dispatcher.add_handler(handler_lvl)
-
+    # сначала для ConversationHandler, потом остальные, потому что не работает тогда выход из диалога
     handler_reg = ConversationHandler(
         entry_points=[
             CommandHandler('reg', registr_handler, pass_user_data=True)
@@ -643,7 +672,8 @@ def main():
             ]
         },
         fallbacks=[
-            CommandHandler('cancel', cancel_handler)
+            CommandHandler('cancel', cancel_handler),
+            CommandHandler('start', start_handler)
         ]
     )
     updater.dispatcher.add_handler(handler_reg)
@@ -658,11 +688,24 @@ def main():
             ],
         },
         fallbacks=[
-            CommandHandler('cancel', cancel_handler)
+            CommandHandler('cancel', cancel_handler),
+            CommandHandler('start', start_handler)
         ],
         # per_message=True
     )
     updater.dispatcher.add_handler(handler_conv)
+
+    handler_start = CommandHandler('start', start_handler)
+    updater.dispatcher.add_handler(handler_start)
+
+    handler_help = CommandHandler('help', help_handler)
+    updater.dispatcher.add_handler(handler_help)
+
+    handler_plan = CommandHandler('plan', plan_handler)
+    updater.dispatcher.add_handler(handler_plan)
+
+    handler_lvl = CommandHandler('level', get_lvl_handler)
+    updater.dispatcher.add_handler(handler_lvl)
 
     handler_shutup = MessageHandler(Filters.all, shut_up_handler)
     updater.dispatcher.add_handler(handler_shutup)
