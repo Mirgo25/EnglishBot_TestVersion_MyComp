@@ -121,6 +121,13 @@ def get_lvl(conn, user_id: int):
 
 
 @ensure_connection
+def set_lvl(conn, user_id: int, level: int):
+        cursor = conn.cursor()
+        cursor.execute(f"UPDATE users SET level={level} WHERE user_id={user_id}")
+        conn.commit()
+
+
+@ensure_connection
 def get_info_from_db(conn, user_id: int) -> Tuple[str, tuple, Dict[str, str], Dict[str, str]]:
         """
         Получение темы, подтем, описаний подтем и ссылок на каждую подтему в зависимости от уровня пользователя

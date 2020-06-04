@@ -31,11 +31,7 @@ from telegram.utils.request import Request
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 debug_requests = logger_factory(logger=logger)
-sub_count = 0           # Для счета подтем
-quest_count = 0         # Для счета вопросов
-quest_used = list()     # Список использованных вопросов
-correct_ans_count = 0   # Для подсчета правильных ответов
-flag_shutup = 0         # Для отсчета присланных юзером ненужных сообщений
+
 
 #  <=========================== Inline и Reply клавиатуры =========================================>
 @debug_requests
@@ -165,21 +161,14 @@ def keyboard_handler(update: Update, context: CallbackContext):
     theme, tup_subthemes, descrp_dict, links_dict = get_info_from_db(user_id=user_id)
     last_index = len(tup_subthemes)-1   # Последний индекс кортежа из подтем
 
-    # Получаем все вопросы и ответы на них в зависимости от прошедшей темы
-    quest_ans, questions, correct_ans = get_tests_from_db(user_id=user_id)
-    context.user_data['QUEST_ANS'] = quest_ans
-    context.user_data['QUESTIONS'] = questions
-    context.user_data['CORRECT_ANS'] = correct_ans
-
     # При каждом нажатии на кнопку Telegram будет присылать callback_query
     # Идентификатор нажатой кнопки (callback_query.data)
     query = update.callback_query
     data = query.data
 
     if data == constants.CALLBACK_BUTTON_START:
-        global sub_count
-        print("Нажал на START. sub_count стал ", sub_count)
-        subtheme = tup_subthemes[sub_count]
+        print("Нажал на START. sub_count стал ", context.chat_data['sub_count'])
+        subtheme = tup_subthemes[context.chat_data['sub_count']]
         info = f'*{theme}*\n\n_{subtheme}_\n\n{descrp_dict[subtheme]}'
         update.effective_message.reply_markdown(
             text=info,
@@ -188,21 +177,21 @@ def keyboard_handler(update: Update, context: CallbackContext):
         print("Отработал START\n")
 
     elif data == constants.CALLBACK_BUTTON_NEXT:
-        sub_count += 1
+        context.chat_data['sub_count'] += 1
 
-        if sub_count > last_index:      # Для того, чтобы счет подтем не выходил
-            sub_count = last_index      # за пределы количества подтем (длины кортежа)
-        print("Нажал на NEXT. sub_count стал ", sub_count)
+        if context.chat_data['sub_count'] > last_index:      # Для того, чтобы счет подтем не выходил
+            context.chat_data['sub_count'] = last_index      # за пределы количества подтем (длины кортежа)
+        print("Нажал на NEXT. sub_count стал ", context.chat_data['sub_count'])
 
-        subtheme = tup_subthemes[sub_count]
+        subtheme = tup_subthemes[context.chat_data['sub_count']]
         info = f'*{theme}*\n\n_{subtheme}_\n\n{descrp_dict[subtheme]}'
-        if sub_count < last_index:
+        if context.chat_data['sub_count'] < last_index:
             query.edit_message_text(
                 text=info,
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=get_middle_inline_keyboard(links_dict[subtheme])
             )
-        elif sub_count == last_index:
+        elif context.chat_data['sub_count'] == last_index:
             query.edit_message_text(
                 text=info,
                 parse_mode=ParseMode.MARKDOWN,
@@ -211,21 +200,21 @@ def keyboard_handler(update: Update, context: CallbackContext):
         print("Отработал NEXT\n")
 
     elif data == constants.CALLBACK_BUTTON_BACK:
-        sub_count -= 1
+        context.chat_data['sub_count'] -= 1
 
-        if sub_count <= 0:      # Для того, чтобы счет подтем не был меньше 0
-            sub_count = 0
-        print("Нажал на BACK. sub_count стал ", sub_count)
+        if context.chat_data['sub_count'] <= 0:      # Для того, чтобы счет подтем не был меньше 0
+            context.chat_data['sub_count'] = 0
+        print("Нажал на BACK. sub_count стал ", context.chat_data['sub_count'])
 
-        subtheme = tup_subthemes[sub_count]
+        subtheme = tup_subthemes[context.chat_data['sub_count']]
         info = f'*{theme}*\n\n_{subtheme}_\n\n{descrp_dict[subtheme]}'
-        if sub_count > 0:
+        if context.chat_data['sub_count'] > 0:
             query.edit_message_text(
                 text=info,
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=get_middle_inline_keyboard(links_dict[subtheme])
             )
-        elif sub_count == 0:
+        elif context.chat_data['sub_count'] == 0:
             query.edit_message_text(
                 text=info,
                 parse_mode=ParseMode.MARKDOWN,
@@ -235,15 +224,18 @@ def keyboard_handler(update: Update, context: CallbackContext):
 
     elif data == constants.CALLBACK_BUTTON_TEST:
         print("Нажал на TEST.")
-        sub_count = 0       # Обнуляем, чтобы новое открытие тем не было с конца
-        global quest_count
-        global quest_used
-        quest_used = []
-        quest_count, ans_var, text = parse.get_test_msg(
+        # Получаем все вопросы и ответы на них в зависимости от прошедшей темы
+        quest_ans, questions, correct_ans = get_tests_from_db(user_id=user_id)
+        context.user_data['QUEST_ANS'] = quest_ans
+        context.user_data['QUESTIONS'] = questions
+        context.user_data['CORRECT_ANS'] = correct_ans
+        context.chat_data['sub_count'] = 0       # Обнуляем, чтобы новое открытие тем не было с конца
+        context.chat_data['quest_used'] = []
+        context.chat_data['quest_count'], ans_var, text = parse.get_test_msg(
             questions=questions,
             quest_ans=quest_ans,
-            quest_used=quest_used,
-            quest_count=quest_count
+            quest_used=context.chat_data['quest_used'],
+            quest_count=context.chat_data['quest_count']
         )
 
         context.user_data['ANS_VAR'] = ans_var
@@ -276,42 +268,39 @@ def button_vars_handler(update: Update, context: CallbackContext):
 
     if data == constants.CALLBACK_BUTTON_VAR1:
         print("Нажал на VAR1.")
-        global quest_count
-        global quest_used
-        global correct_ans_count
 
-        quest_count, correct_ans_count, ans_var, text, text_answer = parse.check_answer(
+        context.chat_data['quest_count'], context.chat_data['correct_ans_count'], ans_var, text, text_answer = parse.check_answer(
             button=data,
             ans_var=ans_var,
             correct_ans=correct_ans,
             questions=questions,
             quest_ans=quest_ans,
-            quest_used=quest_used,
-            quest_count=quest_count,
-            correct_ans_count=correct_ans_count
+            quest_used=context.chat_data['quest_used'],
+            quest_count=context.chat_data['quest_count'],
+            correct_ans_count=context.chat_data['correct_ans_count']
         )
         query.edit_message_text(
             text=text_answer
         )
         context.user_data['ANS_VAR'] = ans_var
-        if quest_count == 0:                                # Когда закончились вопросы
+        if context.chat_data['quest_count'] == 0:                                # Когда закончились вопросы
             for i in range(len(correct_ans)):               # Для удаления всех ответов пользователя
                 query.message.delete()
                 update.effective_message.message_id -= 1
-            if correct_ans_count == len(correct_ans):       # Если все ответы верны
+            if context.chat_data['correct_ans_count'] == len(correct_ans):       # Если все ответы верны
                 inc_lvl(user_id=update.effective_user.id)
                 update.effective_message.reply_markdown(text=constants.congrat_msg)
                 update.effective_message.reply_markdown(
                     text=constants.offer_msg,
                     reply_markup=get_button_new_theme()
                 )
-            elif correct_ans_count != len(correct_ans):     # Если хоть один ответ не верный
+            elif context.chat_data['correct_ans_count'] != len(correct_ans):     # Если хоть один ответ не верный
                 update.effective_message.reply_markdown(
                     text=constants.upset_msg,
                     reply_markup=get_button_old_theme()
                 )
-            print("Conversation --- END. {} прав ответов\n".format(correct_ans_count))
-            correct_ans_count = 0
+            print("Conversation --- END. {} прав ответов\n".format(context.chat_data['correct_ans_count']))
+            context.chat_data['correct_ans_count'] = 0
             return ConversationHandler.END
         update.effective_message.reply_markdown(
             text=text,
@@ -322,38 +311,38 @@ def button_vars_handler(update: Update, context: CallbackContext):
 
     elif data == constants.CALLBACK_BUTTON_VAR2:
         print("Нажал на VAR2.")
-        quest_count, correct_ans_count, ans_var, text, text_answer = parse.check_answer(
+        context.chat_data['quest_count'], context.chat_data['correct_ans_count'], ans_var, text, text_answer = parse.check_answer(
             button=data,
             ans_var=ans_var,
             correct_ans=correct_ans,
             questions=questions,
             quest_ans=quest_ans,
-            quest_used=quest_used,
-            quest_count=quest_count,
-            correct_ans_count=correct_ans_count
+            quest_used=context.chat_data['quest_used'],
+            quest_count=context.chat_data['quest_count'],
+            correct_ans_count=context.chat_data['correct_ans_count']
         )
         query.edit_message_text(
             text=text_answer
         )
         context.user_data['ANS_VAR'] = ans_var
-        if quest_count == 0:
+        if context.chat_data['quest_count'] == 0:
             for i in range(len(correct_ans)):
                 query.message.delete()
                 update.effective_message.message_id -= 1
-            if correct_ans_count == len(correct_ans):
+            if context.chat_data['correct_ans_count'] == len(correct_ans):
                 inc_lvl(user_id=update.effective_user.id)
                 update.effective_message.reply_markdown(text=constants.congrat_msg)
                 update.effective_message.reply_markdown(
                     text=constants.offer_msg,
                     reply_markup=get_button_new_theme()
                 )
-            elif correct_ans_count != len(correct_ans):
+            elif context.chat_data['correct_ans_count'] != len(correct_ans):
                 update.effective_message.reply_markdown(
                     text=constants.upset_msg,
                     reply_markup=get_button_old_theme()
                 )
-            print("Conversation --- END. {} прав ответов\n".format(correct_ans_count))
-            correct_ans_count = 0
+            print("Conversation --- END. {} прав ответов\n".format(context.chat_data['correct_ans_count']))
+            context.chat_data['correct_ans_count'] = 0
             return ConversationHandler.END
         update.effective_message.reply_markdown(
             text=text,
@@ -363,38 +352,38 @@ def button_vars_handler(update: Update, context: CallbackContext):
 
     elif data == constants.CALLBACK_BUTTON_VAR3:
         print("Нажал на VAR3.")
-        quest_count, correct_ans_count, ans_var, text, text_answer = parse.check_answer(
+        context.chat_data['quest_count'], context.chat_data['correct_ans_count'], ans_var, text, text_answer = parse.check_answer(
             button=data,
             ans_var=ans_var,
             correct_ans=correct_ans,
             questions=questions,
             quest_ans=quest_ans,
-            quest_used=quest_used,
-            quest_count=quest_count,
-            correct_ans_count=correct_ans_count
+            quest_used=context.chat_data['quest_used'],
+            quest_count=context.chat_data['quest_count'],
+            correct_ans_count=context.chat_data['correct_ans_count']
         )
         query.edit_message_text(
             text=text_answer
         )
         context.user_data['ANS_VAR'] = ans_var
-        if quest_count == 0:
+        if context.chat_data['quest_count'] == 0:
             for i in range(len(correct_ans)):
                 query.message.delete()
                 update.effective_message.message_id -= 1
-            if correct_ans_count == len(correct_ans):
+            if context.chat_data['correct_ans_count'] == len(correct_ans):
                 inc_lvl(user_id=update.effective_user.id)
                 update.effective_message.reply_markdown(text=constants.congrat_msg)
                 update.effective_message.reply_markdown(
                     text=constants.offer_msg,
                     reply_markup=get_button_new_theme()
                 )
-            elif correct_ans_count != len(correct_ans):
+            elif context.chat_data['correct_ans_count'] != len(correct_ans):
                 update.effective_message.reply_markdown(
                     text=constants.upset_msg,
                     reply_markup=get_button_old_theme()
                 )
-            print("Conversation --- END. {} прав ответов\n".format(correct_ans_count))
-            correct_ans_count = 0
+            print("Conversation --- END. {} прав ответов\n".format(context.chat_data['correct_ans_count']))
+            context.chat_data['correct_ans_count'] = 0
             return ConversationHandler.END
         update.effective_message.reply_markdown(
             text=text,
@@ -405,39 +394,39 @@ def button_vars_handler(update: Update, context: CallbackContext):
     elif data == constants.CALLBACK_BUTTON_VAR4:
         print("Нажал на VAR4.")
         # Проверка ответа пользователя
-        quest_count, correct_ans_count, ans_var, text, text_answer = parse.check_answer(
+        context.chat_data['quest_count'], context.chat_data['correct_ans_count'], ans_var, text, text_answer = parse.check_answer(
             button=data,
             ans_var=ans_var,
             correct_ans=correct_ans,
             questions=questions,
             quest_ans=quest_ans,
-            quest_used=quest_used,
-            quest_count=quest_count,
-            correct_ans_count=correct_ans_count
+            quest_used=context.chat_data['quest_used'],
+            quest_count=context.chat_data['quest_count'],
+            correct_ans_count=context.chat_data['correct_ans_count']
         )
         # Ответ от бота
         query.edit_message_text(
             text=text_answer
         )
         context.user_data['ANS_VAR'] = ans_var
-        if quest_count == 0:
+        if context.chat_data['quest_count'] == 0:
             for i in range(len(correct_ans)):
                 query.message.delete()
                 update.effective_message.message_id -= 1
-            if correct_ans_count == len(correct_ans):
+            if context.chat_data['correct_ans_count'] == len(correct_ans):
                 inc_lvl(user_id=update.effective_user.id)
                 update.effective_message.reply_markdown(text=constants.congrat_msg)
                 update.effective_message.reply_markdown(
                     text=constants.offer_msg,
                     reply_markup=get_button_new_theme()
                 )
-            elif correct_ans_count != len(correct_ans):
+            elif context.chat_data['correct_ans_count'] != len(correct_ans):
                 update.effective_message.reply_markdown(
                     text=constants.upset_msg,
                     reply_markup=get_button_old_theme()
                 )
-            print("Conversation --- END. {} прав ответов\n".format(correct_ans_count))
-            correct_ans_count = 0
+            print("Conversation --- END. {} прав ответов\n".format(context.chat_data['correct_ans_count']))
+            context.chat_data['correct_ans_count'] = 0
             return ConversationHandler.END
         update.effective_message.reply_markdown(
             text=text,
@@ -445,7 +434,7 @@ def button_vars_handler(update: Update, context: CallbackContext):
         )
         print("Отработал VAR4 \n")
 
-    print("Conversation --- CONTINUE {}\n".format(correct_ans_count))
+    print("Conversation --- CONTINUE {}\n".format(context.chat_data['correct_ans_count']))
     return constants.VARS
 #  <========================================================================================>
 
@@ -456,6 +445,9 @@ def start_handler(update: Update, context: CallbackContext):
     Начало работы бота.
     Если юзер был зарегистрирован, то он удаляется с таблицы users.
     """
+    # Инициализация переменных в chat_data
+    init_global_vars(context)
+
     user_id = update.effective_user.id
     if get_user_from_db(user_id=user_id) is not None:
         delete_user_from_db(user_id=user_id)
@@ -490,7 +482,7 @@ def plan_handler(update: Update, context: CallbackContext):
 @debug_requests
 def get_lvl_handler(update: Update, context: CallbackContext):
     """
-    Получение уровня пользователя
+    Получение уровня пользователя.
     """
     lvl = get_lvl(user_id=update.effective_user.id)
     if isinstance(lvl, int):
@@ -499,20 +491,34 @@ def get_lvl_handler(update: Update, context: CallbackContext):
         update.message.reply_text(text=lvl)
 
 
+# @debug_requests
+# def choose_theme_handler(update: Update, context: CallbackContext):
+#     """
+#     Выбор темы пользователем, которую он проходил.
+#     (Для повторения, например)
+#     """
+#     if
+#     user_id = update.effective_user.id
+#     lvl = get_lvl(user_id=update.effective_user.id)
+#     if lvl :
+#         update.message.reply_text(text=f"Ваш уровень: {lvl}")
+#     elif isinstance(lvl, str):
+#         update.message.reply_text(text=lvl)
+
+
 @debug_requests
-def shut_up_handler(update: Update, context: CallbackContext):
+def quiet_handler(update: Update, context: CallbackContext):
     """
-    SHUT UP!!
+    Успокоить пользователя.
     """
-    global flag_shutup
     # user_id = update.effective_user.id
     # text = update.effective_message.text
     #
     # if user_id == 357912833:
     #     update.effective_message.bot.send_message(chat_id=429623673, text=text)
 
-    if flag_shutup < 2:
-        flag_shutup += 1
+    if context.chat_data['flag_upshut'] < 2:
+        context.chat_data['flag_upshut'] += 1
     else:
         update.effective_message.reply_sticker(
             sticker=Sticker(
@@ -523,7 +529,7 @@ def shut_up_handler(update: Update, context: CallbackContext):
                 is_animated=True
             )
         )
-        flag_shutup = 0
+        context.chat_data['flag_upshut'] = 0
 
 
 #  <============================== Для регистрации в боте ========================================>
@@ -627,14 +633,20 @@ def cancel_handler(update: Update, context: CallbackContext):
                 )
             )
             context.chat_data['in_conv_test'] = False
-    except Exception as e:
-        print(e)
+    except KeyError:
+        pass
 
     return ConversationHandler.END
 #  <========================================================================================>
 
 
-
+# Инициализация глобальных переменных для пользователя
+def init_global_vars(context: CallbackContext):
+    context.chat_data['sub_count'] = constants.sub_count
+    context.chat_data['quest_count'] = constants.quest_count
+    context.chat_data['quest_used'] = constants.quest_used
+    context.chat_data['correct_ans_count'] = constants.correct_ans_count
+    context.chat_data['flag_upshut'] = constants.flag_upshut
 
 def main():
     logger.info('Start EnglishBot')
@@ -655,7 +667,7 @@ def main():
     logger.info(f'Bot information: {info}')
 
     # Подключение к СУБД
-    # init_db()
+    init_db()
 
     # Повесить обработчики команд
     # сначала для ConversationHandler, потом остальные, потому что не работает тогда выход из диалога
@@ -707,8 +719,9 @@ def main():
     handler_lvl = CommandHandler('level', get_lvl_handler)
     updater.dispatcher.add_handler(handler_lvl)
 
-    handler_shutup = MessageHandler(Filters.all, shut_up_handler)
-    updater.dispatcher.add_handler(handler_shutup)
+    handler_quiet = MessageHandler(Filters.all, quiet_handler)
+    updater.dispatcher.add_handler(handler_quiet)
+
 
 
 

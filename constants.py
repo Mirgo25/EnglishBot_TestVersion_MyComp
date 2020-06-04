@@ -1,3 +1,9 @@
+sub_count = 0           # Для счета подтем
+quest_count = 0         # Для счета вопросов
+quest_used = list()     # Список использованных вопросов
+correct_ans_count = 0   # Для подсчета правильных ответов
+flag_upshut = 0         # Для отсчета присланных юзером ненужных сообщений
+
 NAME, SURNAME = range(2)
 VARS = 'VARS'
 
