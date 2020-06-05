@@ -4,7 +4,7 @@ import re
 # ==================== My modules ========================
 from db import (init_db, add_user_to_db, get_user_from_db,
                 delete_user_from_db, get_lvl, inc_lvl,
-                get_info_from_db, get_tests_from_db)
+                get_info_from_db, get_tests_from_db, set_lvl)
 import constants
 import parse
 from echo.config import load_config
@@ -97,6 +97,29 @@ def get_finish_inline_keyboard(link: str):
     ]
     return InlineKeyboardMarkup(keyboard)
 
+
+@debug_requests
+def get_finish_keyboard_changed_theme(link: str):
+    """
+    Получить клавиатуру при обзоре последней подтемы
+    """
+    keyboard = [
+        # В этом списке каждый список - это строка,
+        # В каждом списке находяться кнопки. Сколько кнопок, столько столбцов
+        [
+            InlineKeyboardButton(constants.TITLES[constants.CALLBACK_BUTTON_LINK],
+                                 url=link)
+        ],
+        [
+            InlineKeyboardButton(constants.BUTTON_TITLE_RET_THEME,
+                                 callback_data=constants.CALLBACK_BUTTON_TEST),
+        ],
+        [
+            InlineKeyboardButton(constants.TITLES[constants.CALLBACK_BUTTON_BACK],
+                                 callback_data=constants.CALLBACK_BUTTON_BACK),
+        ],
+    ]
+    return InlineKeyboardMarkup(keyboard)
 
 @debug_requests
 def get_inline_keyboard_for_tests():
@@ -192,6 +215,19 @@ def keyboard_handler(update: Update, context: CallbackContext):
                 reply_markup=get_middle_inline_keyboard(links_dict[subtheme])
             )
         elif context.chat_data['sub_count'] == last_index:
+
+            # Если это тема, которую уже проходил user, то меняем название кнопки "TEST".
+            try:
+                if context.user_data['level']:
+                    query.edit_message_text(
+                        text=info,
+                        parse_mode=ParseMode.MARKDOWN,
+                        reply_markup=get_finish_keyboard_changed_theme(links_dict[subtheme])
+                    )
+                    return
+            except KeyError:
+                pass
+
             query.edit_message_text(
                 text=info,
                 parse_mode=ParseMode.MARKDOWN,
@@ -224,6 +260,23 @@ def keyboard_handler(update: Update, context: CallbackContext):
 
     elif data == constants.CALLBACK_BUTTON_TEST:
         print("Нажал на TEST.")
+        # Если это тема, которую уже проходил user, то меняем уровень после её прохождения на тот что был.
+        try:
+            if context.user_data['level']:
+                set_lvl(user_id=user_id, level=context.user_data['level'])
+                del context.user_data['level']          # Удаляем level в user_data, потому что уже его вернули обратно
+                theme, tup_subthemes, descrp_dict, links_dict = get_info_from_db(user_id=user_id)
+                context.chat_data['sub_count'] = 0
+                update.effective_message.delete()
+                subtheme = tup_subthemes[context.chat_data['sub_count']]
+                info = f'*{theme}*\n\n_{subtheme}_\n\n{descrp_dict[subtheme]}'
+                update.effective_message.reply_markdown(
+                    text=info,
+                    reply_markup=get_start_inline_keyboard(links_dict[subtheme])
+                )
+                return
+        except KeyError:
+            pass
         # Получаем все вопросы и ответы на них в зависимости от прошедшей темы
         quest_ans, questions, correct_ans = get_tests_from_db(user_id=user_id)
         context.user_data['QUEST_ANS'] = quest_ans
@@ -237,8 +290,10 @@ def keyboard_handler(update: Update, context: CallbackContext):
             quest_used=context.chat_data['quest_used'],
             quest_count=context.chat_data['quest_count']
         )
-
         context.user_data['ANS_VAR'] = ans_var
+
+
+
         update.effective_message.delete()
         update.effective_message.reply_markdown(
             text=text,
@@ -260,6 +315,8 @@ def button_vars_handler(update: Update, context: CallbackContext):
     # Идентификатор нажатой кнопки (callback_query.data)
     query = update.callback_query
     data = query.data
+
+    user_id = update.effective_user.id
 
     ans_var = context.user_data['ANS_VAR']
     questions = context.user_data['QUESTIONS']
@@ -288,7 +345,7 @@ def button_vars_handler(update: Update, context: CallbackContext):
                 query.message.delete()
                 update.effective_message.message_id -= 1
             if context.chat_data['correct_ans_count'] == len(correct_ans):       # Если все ответы верны
-                inc_lvl(user_id=update.effective_user.id)
+                inc_lvl(user_id=user_id)
                 update.effective_message.reply_markdown(text=constants.congrat_msg)
                 update.effective_message.reply_markdown(
                     text=constants.offer_msg,
@@ -330,7 +387,7 @@ def button_vars_handler(update: Update, context: CallbackContext):
                 query.message.delete()
                 update.effective_message.message_id -= 1
             if context.chat_data['correct_ans_count'] == len(correct_ans):
-                inc_lvl(user_id=update.effective_user.id)
+                inc_lvl(user_id=user_id)
                 update.effective_message.reply_markdown(text=constants.congrat_msg)
                 update.effective_message.reply_markdown(
                     text=constants.offer_msg,
@@ -371,7 +428,7 @@ def button_vars_handler(update: Update, context: CallbackContext):
                 query.message.delete()
                 update.effective_message.message_id -= 1
             if context.chat_data['correct_ans_count'] == len(correct_ans):
-                inc_lvl(user_id=update.effective_user.id)
+                inc_lvl(user_id=user_id)
                 update.effective_message.reply_markdown(text=constants.congrat_msg)
                 update.effective_message.reply_markdown(
                     text=constants.offer_msg,
@@ -414,7 +471,7 @@ def button_vars_handler(update: Update, context: CallbackContext):
                 query.message.delete()
                 update.effective_message.message_id -= 1
             if context.chat_data['correct_ans_count'] == len(correct_ans):
-                inc_lvl(user_id=update.effective_user.id)
+                inc_lvl(user_id=user_id)
                 update.effective_message.reply_markdown(text=constants.congrat_msg)
                 update.effective_message.reply_markdown(
                     text=constants.offer_msg,
@@ -433,7 +490,6 @@ def button_vars_handler(update: Update, context: CallbackContext):
             reply_markup=get_inline_keyboard_for_tests()
         )
         print("Отработал VAR4 \n")
-
     print("Conversation --- CONTINUE {}\n".format(context.chat_data['correct_ans_count']))
     return constants.VARS
 #  <========================================================================================>
@@ -446,7 +502,7 @@ def start_handler(update: Update, context: CallbackContext):
     Если юзер был зарегистрирован, то он удаляется с таблицы users.
     """
     # Инициализация переменных в chat_data
-    init_global_vars(context)
+    init_global_vars(update=update, context=context)
 
     user_id = update.effective_user.id
     if get_user_from_db(user_id=user_id) is not None:
@@ -454,10 +510,12 @@ def start_handler(update: Update, context: CallbackContext):
         update.message.reply_markdown(text=constants.del_user_msg)
     else:
         update.message.reply_markdown(text=constants.greeting_msg)
-    try:
-        if context.chat_data['in_conv_reg'] or context.chat_data['in_conv_test']:    # Если в диалоге, то отменить диалог
+
+    try:        # Если в диалоге, то отменить диалог
+        if context.chat_data['in_conv_reg'] or context.chat_data['in_conv_test'] or context.chat_data['in_conv_theme']:
             context.chat_data['in_conv_reg'] = False
             context.chat_data['in_conv_test'] = False
+            context.chat_data['in_conv_theme'] = False
             return ConversationHandler.END
     except KeyError:
         pass
@@ -491,21 +549,6 @@ def get_lvl_handler(update: Update, context: CallbackContext):
         update.message.reply_text(text=lvl)
 
 
-# @debug_requests
-# def choose_theme_handler(update: Update, context: CallbackContext):
-#     """
-#     Выбор темы пользователем, которую он проходил.
-#     (Для повторения, например)
-#     """
-#     if
-#     user_id = update.effective_user.id
-#     lvl = get_lvl(user_id=update.effective_user.id)
-#     if lvl :
-#         update.message.reply_text(text=f"Ваш уровень: {lvl}")
-#     elif isinstance(lvl, str):
-#         update.message.reply_text(text=lvl)
-
-
 @debug_requests
 def quiet_handler(update: Update, context: CallbackContext):
     """
@@ -519,9 +562,9 @@ def quiet_handler(update: Update, context: CallbackContext):
 
     if context.chat_data['flag_upshut'] < 2:
         context.chat_data['flag_upshut'] += 1
-    else:
+    elif context.chat_data['flag_for_del_msg'] < 1:
         update.effective_message.reply_sticker(
-            sticker=Sticker(
+            sticker=Sticker(                    # Стикер "Приведение (Чшшш)"
                 file_id='CAACAgIAAxkBAAIEa17LHgIb22R-EgkdalwzI327QeVAAAK-AAMw1J0RtKcIkYQmscoZBA',
                 file_unique_id='AgADvgADMNSdEQ',
                 width=512,
@@ -529,7 +572,22 @@ def quiet_handler(update: Update, context: CallbackContext):
                 is_animated=True
             )
         )
+        context.chat_data['flag_for_del_msg'] += 1
         context.chat_data['flag_upshut'] = 0
+    elif context.chat_data['flag_for_del_msg'] == 1:
+        update.effective_message.reply_sticker(
+            sticker=Sticker(                    # Стикер "Приведение (Лопает)"
+                file_id='CAACAgIAAxkBAAIHbl7Zja1kbyzuuk-pggdbRiFPRHFiAAK8AAMw1J0Rd5meEIvSc6IaBA',
+                file_unique_id='AgADvAADMNSdEQ',
+                width=512,
+                height=512,
+                is_animated=True
+            )
+        )
+        context.chat_data['flag_for_del_msg'] += 1
+        context.chat_data['flag_upshut'] = 3
+    else:
+        update.effective_message.delete()
 
 
 #  <============================== Для регистрации в боте ========================================>
@@ -605,7 +663,54 @@ def surname_handler(update: Update, context: CallbackContext):
     )
     context.chat_data['in_conv_reg'] = False
     return ConversationHandler.END
+#  <========================================================================================>
 
+
+#  <============================== Для смены темы в боте ========================================>
+@debug_requests
+def choose_theme_handler1(update: Update, context: CallbackContext):
+    """
+    Начало диалога для выбора темы пользователем, которую он проходил.
+    (Для повторения, например)
+    """
+    context.chat_data['in_conv_theme'] = True
+    update.message.reply_markdown(text=constants.choose_theme_msg)
+    return constants.THEME
+
+
+@debug_requests
+def choose_theme_handler2(update: Update, context: CallbackContext):
+    """
+    Выбор темы пользователем, которую он проходил.
+    (Для повторения, например)
+    """
+    user_id = update.effective_user.id
+    msg = int(update.effective_message.text)
+    lvl = get_lvl(user_id=update.effective_user.id)
+
+    if msg >= lvl:
+        update.message.reply_markdown(text="⛔️⛔️⛔️\n_К сожалению, вам не доступна эта тема_")
+        return constants.THEME
+    elif 0 >= msg < 8:
+        update.message.reply_markdown(text="⛔️⛔️⛔️\n_Неверно введенный номер темы_")
+        return constants.THEME
+    else:
+        context.user_data['level'] = lvl
+        set_lvl(user_id=user_id, level=msg)
+        context.chat_data['in_conv_theme'] = False
+        update.message.reply_markdown(
+            text=f"✅Тема №{msg} выбрана",
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(text=constants.TITLES[constants.CALLBACK_BUTTON_START],
+                                             callback_data=constants.CALLBACK_BUTTON_START)
+                    ],
+                ],
+            )
+        )
+        return ConversationHandler.END
+#  <========================================================================================>
 
 @debug_requests
 def cancel_handler(update: Update, context: CallbackContext):
@@ -614,7 +719,7 @@ def cancel_handler(update: Update, context: CallbackContext):
     """
     try:
         if context.chat_data['in_conv_reg']:
-            update.message.reply_text(text='Отмена.\nДля регистрации с нуля нажмите /reg')
+            update.message.reply_text(text='🚫Отмена.\nДля регистрации с нуля нажмите /reg')
             context.chat_data['in_conv_reg'] = False
     except KeyError:
         pass
@@ -622,7 +727,7 @@ def cancel_handler(update: Update, context: CallbackContext):
     try:
         if context.chat_data['in_conv_test']:
             update.message.reply_markdown(
-                text='Отмена теста.\nПожалуйста, пройдите заново материал.',
+                text='🚫Отмена теста.\nПожалуйста, пройдите заново материал.',
                 reply_markup=InlineKeyboardMarkup(
                     inline_keyboard=[
                         [
@@ -636,17 +741,32 @@ def cancel_handler(update: Update, context: CallbackContext):
     except KeyError:
         pass
 
+    try:
+        if context.chat_data['in_conv_theme']:
+            update.message.reply_markdown(
+                text='🚫Отмена.\n Для продолжения изучения нажмите кнопку.',
+                reply_markup=InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [
+                            InlineKeyboardButton(text=constants.TITLES[constants.CALLBACK_BUTTON_START],
+                                                 callback_data=constants.CALLBACK_BUTTON_START)
+                        ],
+                    ],
+                )
+            )
+            context.chat_data['in_conv_theme'] = False
+    except KeyError:
+        pass
     return ConversationHandler.END
-#  <========================================================================================>
-
 
 # Инициализация глобальных переменных для пользователя
-def init_global_vars(context: CallbackContext):
+def init_global_vars(update: Update, context: CallbackContext):
     context.chat_data['sub_count'] = constants.sub_count
     context.chat_data['quest_count'] = constants.quest_count
     context.chat_data['quest_used'] = constants.quest_used
     context.chat_data['correct_ans_count'] = constants.correct_ans_count
     context.chat_data['flag_upshut'] = constants.flag_upshut
+    context.chat_data['flag_for_del_msg'] = constants.flag_for_del_msg
 
 def main():
     logger.info('Start EnglishBot')
@@ -690,7 +810,7 @@ def main():
     )
     updater.dispatcher.add_handler(handler_reg)
 
-    handler_conv = ConversationHandler(
+    handler_test = ConversationHandler(
         entry_points=[
             CallbackQueryHandler(callback=keyboard_handler, pass_user_data=True)
         ],
@@ -705,7 +825,24 @@ def main():
         ],
         # per_message=True
     )
-    updater.dispatcher.add_handler(handler_conv)
+    updater.dispatcher.add_handler(handler_test)
+
+    handler_choose_theme = ConversationHandler(
+        entry_points=[
+            CommandHandler('theme', choose_theme_handler1)
+        ],
+        states={
+            constants.THEME: [
+                MessageHandler((Filters.text & (~Filters.command) & Filters.regex(r'^-\d+$|^\d+$')), choose_theme_handler2)
+            ],
+        },
+        fallbacks=[
+            CommandHandler('cancel', cancel_handler),
+            CommandHandler('start', start_handler)
+        ],
+        # per_message=True
+    )
+    updater.dispatcher.add_handler(handler_choose_theme)
 
     handler_start = CommandHandler('start', start_handler)
     updater.dispatcher.add_handler(handler_start)
@@ -718,6 +855,8 @@ def main():
 
     handler_lvl = CommandHandler('level', get_lvl_handler)
     updater.dispatcher.add_handler(handler_lvl)
+
+    updater.dispatcher.add_handler(CommandHandler('continue', init_global_vars))
 
     handler_quiet = MessageHandler(Filters.all, quiet_handler)
     updater.dispatcher.add_handler(handler_quiet)
