@@ -3,7 +3,6 @@ import constants
 from typing import Tuple
 
 
-
 def get_test_msg(questions: list, quest_used: list, quest_ans: dict, quest_count: int) -> Tuple[int, tuple, str]:
     quest = random.choice(questions)
     quest_not_used = list(set(questions) - set(quest_used))     # Неиспользованные вопросы
@@ -15,9 +14,9 @@ def get_test_msg(questions: list, quest_used: list, quest_ans: dict, quest_count
         random.shuffle(quest_ans[quest])    # Перемешиваем варианты ответов
         ans_var = quest_ans[quest]
         text = f"""
-            _Вопрос {quest_count}_
+            <i>Вопрос {quest_count}</i>
 
-*{quest}*
+<b>{quest}</b>
 
 1) {ans_var[0]}
 2) {ans_var[1]}

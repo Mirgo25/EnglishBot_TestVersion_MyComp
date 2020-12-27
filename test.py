@@ -102,17 +102,17 @@ def main():
     # s2 = [4]
     # l = list(set(s1) - set(s2))
     # print(l)
+
     def foo(a, b=0, c=0, **kwargs):
         res = a+b+c
-        val_kwargs = list(kwargs.values())
-
+        val_kwargs = list(kwargs.items())
         # res += keys_kwargs[0]
-
         print(res)
         print(val_kwargs)
-
     d = {"g": 15, "h": 6489}
-    foo(a=2, d=300,k=4,g=4)
+    foo(a=2, b=2, d=300,k=5,g=7)
+
+
 
 if __name__ == '__main__':
     main()

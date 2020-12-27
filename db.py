@@ -1,5 +1,6 @@
 from typing import Tuple, Dict
-import mysql.connector
+# import mysql.connector
+import sqlite3
 
 
 DICT_THEMES = {
@@ -12,35 +13,51 @@ DICT_THEMES = {
         7: 'Sentence (Предложение)'
 }
 
+#
+# # ЯКЩО ЩО ПОМІНЯТИ НА НАЧАЛЬНИЙ КОД ПРИЄДНАННЯ БД!!!!!!!!!!!!!!!!!!1
+# class DataConn:
+#
+#         def __init__(self, user, password, host, port, database):
+#                 """Конструктор"""
+#                 self.user = user
+#                 self.password = password
+#                 self.host = host
+#                 self.port = port
+#                 self.database = database
+#
+#         def __enter__(self):
+#                 """
+#                 Открываем подключение с базой данных.
+#                 """
+#                 self.conn = mysql.connector.connect(user=self.user, password=self.password, host=self.host,
+#                                                     port=self.port, database=self.database)
+#                 return self.conn
+#
+#         def __exit__(self, exc_type, exc_val, exc_tb):
+#                 """
+#                 Закрываем подключение.
+#                 """
+#                 self.conn.close()
+#                 if exc_val:
+#                         raise exc_val
 
-# ЯКЩО ЩО ПОМІНЯТИ НА НАЧАЛЬНИЙ КОД ПРИЄДНАННЯ БД!!!!!!!!!!!!!!!!!!1
-class DataConn:
+# # Декоратор для подключения к БД
+# def ensure_connection(func):
+#         """ Декоратор для подключения к БД: открывает соединение,
+#             выполняет переданную функцию и закрывает за собой соединение.
+#             Потокобезопасно!
+#         """
+#
+#         def inner(*args, **kwargs):
+#                 with DataConn(user='root', password='ComeOne288', host='localhost',
+#                               port='3306', database='engbot_database') as conn:
+#                         kwargs['conn'] = conn
+#                         res = func(*args, **kwargs)
+#                 return res
+#         return inner
 
-        def __init__(self, user, password, host, port, database):
-                """Конструктор"""
-                self.user = user
-                self.password = password
-                self.host = host
-                self.port = port
-                self.database = database
 
-        def __enter__(self):
-                """
-                Открываем подключение с базой данных.
-                """
-                self.conn = mysql.connector.connect(user=self.user, password=self.password, host=self.host,
-                                                    port=self.port, database=self.database)
-                return self.conn
 
-        def __exit__(self, exc_type, exc_val, exc_tb):
-                """
-                Закрываем подключение.
-                """
-                self.conn.close()
-                if exc_val:
-                        raise exc_val
-
-# Декоратор для подключения к БД
 def ensure_connection(func):
         """ Декоратор для подключения к БД: открывает соединение,
             выполняет переданную функцию и закрывает за собой соединение.
@@ -48,13 +65,11 @@ def ensure_connection(func):
         """
 
         def inner(*args, **kwargs):
-                with DataConn(user='root', password='ComeOne288', host='localhost',
-                              port='3306', database='engbot_database') as conn:
+                with sqlite3.connect('EnglishBotDatabase.db') as conn:
                         kwargs['conn'] = conn
                         res = func(*args, **kwargs)
                 return res
         return inner
-
 
 
 @ensure_connection
@@ -69,11 +84,22 @@ def init_db(conn, force: bool = False):
 
         if force:
                 cursor.execute('DROP TABLE IF EXISTS users')
+                cursor.execute('DROP TABLE IF EXISTS data_eng')
+                cursor.execute('DROP TABLE IF EXISTS tests_eng')
                 print("Таблица users была удалена!!!")
 
         cursor.execute('''
-                CREATE TABLE IF NOT EXISTS users (id INT AUTO_INCREMENT PRIMARY KEY, first_name VARCHAR(255),
+                CREATE TABLE IF NOT EXISTS users (first_name VARCHAR(255),
                                                   last_name VARCHAR(255), user_id INT UNIQUE, level INT)
+        ''')
+        cursor.execute('''
+                CREATE TABLE IF NOT EXISTS data_eng (theme VARCHAR(144),
+                                                  subtheme VARCHAR(144), description TEXT, link VARCHAR(255))
+        ''')
+        cursor.execute('''
+                CREATE TABLE IF NOT EXISTS tests_eng (theme_quest VARCHAR(144),
+                                                  question VARCHAR(255) UNIQUE, answer1 VARCHAR(255), answer2 VARCHAR(255),
+                                                  answer3 VARCHAR(255), answer4 VARCHAR(255))
         ''')
         # Сохранить изменения
         conn.commit()
@@ -82,9 +108,7 @@ def init_db(conn, force: bool = False):
 @ensure_connection
 def add_user_to_db(conn, first_name: str, last_name: str, user_id: int):
         cursor = conn.cursor()
-        sql = "INSERT INTO users (first_name, last_name, user_id, level) VALUES (%s, %s, %s, 1)"
-        val = (first_name, last_name, user_id)
-        cursor.execute(sql, val)
+        cursor.execute(f"INSERT INTO users (first_name, last_name, user_id, level) VALUES ('{first_name}', '{last_name}', {user_id}, 1)")
         conn.commit()
 
 
@@ -158,6 +182,8 @@ def get_tests_from_db(conn, user_id: int) -> Tuple[Dict[str, list], list, tuple]
         return quest_ans, questions, correct_ans
 
 
-# print(get_info_from_db(user_id=635625366))
-# print(get_lvl(user_id=635625366))
+# add_user_to_db(first_name='asd', last_name='aseq', user_id=4568)
+# print(get_info_from_db(user_id=4568))
+# print(get_lvl(user_id=4568))
 # print(get_tests_from_db(user_id=635625366))
+

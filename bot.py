@@ -1,4 +1,4 @@
-# ================= standart modules =====================
+# ================= standard modules =====================
 import logging
 import re
 # ==================== My modules ========================
@@ -7,7 +7,7 @@ from db import (init_db, add_user_to_db, get_user_from_db,
                 get_info_from_db, get_tests_from_db, set_lvl)
 import constants
 import parse
-from echo.config import load_config
+# from echo.config import load_config
 from echo.utils import logger_factory
 # ================= python-telegram-bot library ==========
 from telegram import Bot
@@ -192,8 +192,8 @@ def keyboard_handler(update: Update, context: CallbackContext):
     if data == constants.CALLBACK_BUTTON_START:
         print("Нажал на START. sub_count стал ", context.chat_data['sub_count'])
         subtheme = tup_subthemes[context.chat_data['sub_count']]
-        info = f'*{theme}*\n\n_{subtheme}_\n\n{descrp_dict[subtheme]}'
-        update.effective_message.reply_markdown(
+        info = f'<b>{theme}</b>\n\n<i>{subtheme}</i>\n\n{descrp_dict[subtheme]}'
+        update.effective_message.reply_html(
             text=info,
             reply_markup=get_start_inline_keyboard(links_dict[subtheme])
         )
@@ -207,11 +207,11 @@ def keyboard_handler(update: Update, context: CallbackContext):
         print("Нажал на NEXT. sub_count стал ", context.chat_data['sub_count'])
 
         subtheme = tup_subthemes[context.chat_data['sub_count']]
-        info = f'*{theme}*\n\n_{subtheme}_\n\n{descrp_dict[subtheme]}'
+        info = f'<b>{theme}</b>\n\n<i>{subtheme}</i>\n\n{descrp_dict[subtheme]}'
         if context.chat_data['sub_count'] < last_index:
             query.edit_message_text(
                 text=info,
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=ParseMode.HTML,
                 reply_markup=get_middle_inline_keyboard(links_dict[subtheme])
             )
         elif context.chat_data['sub_count'] == last_index:
@@ -221,7 +221,7 @@ def keyboard_handler(update: Update, context: CallbackContext):
                 if context.user_data['level']:
                     query.edit_message_text(
                         text=info,
-                        parse_mode=ParseMode.MARKDOWN,
+                        parse_mode=ParseMode.HTML,
                         reply_markup=get_finish_keyboard_changed_theme(links_dict[subtheme])
                     )
                     return
@@ -230,7 +230,7 @@ def keyboard_handler(update: Update, context: CallbackContext):
 
             query.edit_message_text(
                 text=info,
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=ParseMode.HTML,
                 reply_markup=get_finish_inline_keyboard(links_dict[subtheme])
             )
         print("Отработал NEXT\n")
@@ -243,17 +243,17 @@ def keyboard_handler(update: Update, context: CallbackContext):
         print("Нажал на BACK. sub_count стал ", context.chat_data['sub_count'])
 
         subtheme = tup_subthemes[context.chat_data['sub_count']]
-        info = f'*{theme}*\n\n_{subtheme}_\n\n{descrp_dict[subtheme]}'
+        info = f'<b>{theme}</b>\n\n<i>{subtheme}</i>\n\n{descrp_dict[subtheme]}'
         if context.chat_data['sub_count'] > 0:
             query.edit_message_text(
                 text=info,
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=ParseMode.HTML,
                 reply_markup=get_middle_inline_keyboard(links_dict[subtheme])
             )
         elif context.chat_data['sub_count'] == 0:
             query.edit_message_text(
                 text=info,
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=ParseMode.HTML,
                 reply_markup=get_start_inline_keyboard(links_dict[subtheme])
             )
         print("Отработал BACK \n")
@@ -269,8 +269,9 @@ def keyboard_handler(update: Update, context: CallbackContext):
                 context.chat_data['sub_count'] = 0
                 update.effective_message.delete()
                 subtheme = tup_subthemes[context.chat_data['sub_count']]
-                info = f'*{theme}*\n\n_{subtheme}_\n\n{descrp_dict[subtheme]}'
-                update.effective_message.reply_markdown(
+                info = f'<b>{theme}</b>\n\n<i>{subtheme}</i>\n\n{descrp_dict[subtheme]}'
+
+                update.effective_message.reply_html(
                     text=info,
                     reply_markup=get_start_inline_keyboard(links_dict[subtheme])
                 )
@@ -295,7 +296,7 @@ def keyboard_handler(update: Update, context: CallbackContext):
 
 
         update.effective_message.delete()
-        update.effective_message.reply_markdown(
+        update.effective_message.reply_html(
             text=text,
             reply_markup=get_inline_keyboard_for_tests()
         )
@@ -346,20 +347,20 @@ def button_vars_handler(update: Update, context: CallbackContext):
                 update.effective_message.message_id -= 1
             if context.chat_data['correct_ans_count'] == len(correct_ans):       # Если все ответы верны
                 inc_lvl(user_id=user_id)
-                update.effective_message.reply_markdown(text=constants.congrat_msg)
-                update.effective_message.reply_markdown(
+                update.effective_message.reply_html(text=constants.congrat_msg)
+                update.effective_message.reply_html(
                     text=constants.offer_msg,
                     reply_markup=get_button_new_theme()
                 )
             elif context.chat_data['correct_ans_count'] != len(correct_ans):     # Если хоть один ответ не верный
-                update.effective_message.reply_markdown(
+                update.effective_message.reply_html(
                     text=constants.upset_msg,
                     reply_markup=get_button_old_theme()
                 )
             print("Conversation --- END. {} прав ответов\n".format(context.chat_data['correct_ans_count']))
             context.chat_data['correct_ans_count'] = 0
             return ConversationHandler.END
-        update.effective_message.reply_markdown(
+        update.effective_message.reply_html(
             text=text,
             reply_markup=get_inline_keyboard_for_tests()
         )
@@ -388,20 +389,20 @@ def button_vars_handler(update: Update, context: CallbackContext):
                 update.effective_message.message_id -= 1
             if context.chat_data['correct_ans_count'] == len(correct_ans):
                 inc_lvl(user_id=user_id)
-                update.effective_message.reply_markdown(text=constants.congrat_msg)
-                update.effective_message.reply_markdown(
+                update.effective_message.reply_html(text=constants.congrat_msg)
+                update.effective_message.reply_html(
                     text=constants.offer_msg,
                     reply_markup=get_button_new_theme()
                 )
             elif context.chat_data['correct_ans_count'] != len(correct_ans):
-                update.effective_message.reply_markdown(
+                update.effective_message.reply_html(
                     text=constants.upset_msg,
                     reply_markup=get_button_old_theme()
                 )
             print("Conversation --- END. {} прав ответов\n".format(context.chat_data['correct_ans_count']))
             context.chat_data['correct_ans_count'] = 0
             return ConversationHandler.END
-        update.effective_message.reply_markdown(
+        update.effective_message.reply_html(
             text=text,
             reply_markup=get_inline_keyboard_for_tests()
         )
@@ -429,20 +430,20 @@ def button_vars_handler(update: Update, context: CallbackContext):
                 update.effective_message.message_id -= 1
             if context.chat_data['correct_ans_count'] == len(correct_ans):
                 inc_lvl(user_id=user_id)
-                update.effective_message.reply_markdown(text=constants.congrat_msg)
-                update.effective_message.reply_markdown(
+                update.effective_message.reply_html(text=constants.congrat_msg)
+                update.effective_message.reply_html(
                     text=constants.offer_msg,
                     reply_markup=get_button_new_theme()
                 )
             elif context.chat_data['correct_ans_count'] != len(correct_ans):
-                update.effective_message.reply_markdown(
+                update.effective_message.reply_html(
                     text=constants.upset_msg,
                     reply_markup=get_button_old_theme()
                 )
             print("Conversation --- END. {} прав ответов\n".format(context.chat_data['correct_ans_count']))
             context.chat_data['correct_ans_count'] = 0
             return ConversationHandler.END
-        update.effective_message.reply_markdown(
+        update.effective_message.reply_html(
             text=text,
             reply_markup=get_inline_keyboard_for_tests()
         )
@@ -472,20 +473,20 @@ def button_vars_handler(update: Update, context: CallbackContext):
                 update.effective_message.message_id -= 1
             if context.chat_data['correct_ans_count'] == len(correct_ans):
                 inc_lvl(user_id=user_id)
-                update.effective_message.reply_markdown(text=constants.congrat_msg)
-                update.effective_message.reply_markdown(
+                update.effective_message.reply_html(text=constants.congrat_msg)
+                update.effective_message.reply_html(
                     text=constants.offer_msg,
                     reply_markup=get_button_new_theme()
                 )
             elif context.chat_data['correct_ans_count'] != len(correct_ans):
-                update.effective_message.reply_markdown(
+                update.effective_message.reply_html(
                     text=constants.upset_msg,
                     reply_markup=get_button_old_theme()
                 )
             print("Conversation --- END. {} прав ответов\n".format(context.chat_data['correct_ans_count']))
             context.chat_data['correct_ans_count'] = 0
             return ConversationHandler.END
-        update.effective_message.reply_markdown(
+        update.effective_message.reply_html(
             text=text,
             reply_markup=get_inline_keyboard_for_tests()
         )
@@ -507,9 +508,9 @@ def start_handler(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     if get_user_from_db(user_id=user_id) is not None:
         delete_user_from_db(user_id=user_id)
-        update.message.reply_markdown(text=constants.del_user_msg)
+        update.message.reply_html(text=constants.del_user_msg)
     else:
-        update.message.reply_markdown(text=constants.greeting_msg)
+        update.message.reply_html(text=constants.greeting_msg)
 
     try:        # Если в диалоге, то отменить диалог
         if context.chat_data['in_conv_reg'] or context.chat_data['in_conv_test'] or context.chat_data['in_conv_theme']:
@@ -526,7 +527,7 @@ def help_handler(update: Update, context: CallbackContext):
     """
     Описание бота.
     """
-    update.message.reply_markdown(text=constants.help_msg)
+    update.message.reply_html(text=constants.help_msg)
 
 
 @debug_requests
@@ -534,7 +535,7 @@ def plan_handler(update: Update, context: CallbackContext):
     """
     Описание тем обучения.
     """
-    update.message.reply_markdown(text=constants.plan_msg)
+    update.message.reply_html(text=constants.plan_msg)
 
 
 @debug_requests
@@ -650,7 +651,7 @@ def surname_handler(update: Update, context: CallbackContext):
 
     context.user_data.clear()
     update.message.reply_text(text="Вы успешно зарегистрированы!")
-    update.message.reply_markdown(
+    update.message.reply_html(
         text=constants.after_reg_msg,
         reply_markup=InlineKeyboardMarkup(
             inline_keyboard=[
@@ -674,7 +675,7 @@ def choose_theme_handler1(update: Update, context: CallbackContext):
     (Для повторения, например)
     """
     context.chat_data['in_conv_theme'] = True
-    update.message.reply_markdown(text=constants.choose_theme_msg)
+    update.message.reply_html(text=constants.choose_theme_msg)
     return constants.THEME
 
 
@@ -689,16 +690,16 @@ def choose_theme_handler2(update: Update, context: CallbackContext):
     lvl = get_lvl(user_id=update.effective_user.id)
 
     if msg >= lvl:
-        update.message.reply_markdown(text="⛔️⛔️⛔️\n_К сожалению, вам не доступна эта тема_")
+        update.message.reply_html(text="⛔️⛔️⛔️\n<i>К сожалению, вам не доступна эта тема</i>")
         return constants.THEME
     elif 0 >= msg < 8:
-        update.message.reply_markdown(text="⛔️⛔️⛔️\n_Неверно введенный номер темы_")
+        update.message.reply_html(text="⛔️⛔️⛔️\n<i>Неверно введенный номер темы</i>")
         return constants.THEME
     else:
         context.user_data['level'] = lvl
         set_lvl(user_id=user_id, level=msg)
         context.chat_data['in_conv_theme'] = False
-        update.message.reply_markdown(
+        update.message.reply_html(
             text=f"✅Тема №{msg} выбрана",
             reply_markup=InlineKeyboardMarkup(
                 inline_keyboard=[
@@ -726,7 +727,9 @@ def cancel_handler(update: Update, context: CallbackContext):
 
     try:
         if context.chat_data['in_conv_test']:
-            update.message.reply_markdown(
+            context.chat_data['quest_count'] = 0
+            context.chat_data['correct_ans_count'] = 0
+            update.message.reply_html(
                 text='🚫Отмена теста.\nПожалуйста, пройдите заново материал.',
                 reply_markup=InlineKeyboardMarkup(
                     inline_keyboard=[
@@ -743,7 +746,7 @@ def cancel_handler(update: Update, context: CallbackContext):
 
     try:
         if context.chat_data['in_conv_theme']:
-            update.message.reply_markdown(
+            update.message.reply_html(
                 text='🚫Отмена.\n Для продолжения изучения нажмите кнопку.',
                 reply_markup=InlineKeyboardMarkup(
                     inline_keyboard=[
@@ -787,7 +790,7 @@ def main():
     logger.info(f'Bot information: {info}')
 
     # Подключение к СУБД
-    init_db()
+    # init_db()
 
     # Повесить обработчики команд
     # сначала для ConversationHandler, потом остальные, потому что не работает тогда выход из диалога
